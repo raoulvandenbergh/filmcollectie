@@ -3293,7 +3293,7 @@ synchronizeCollection();
   row.querySelector('.remove-row-btn').onclick=()=>{if(el('newFilmCuts').children.length>1)row.remove();else status.textContent='Minimaal één versie is nodig.'};el('newFilmCuts').appendChild(row);
  }
  
-const RC_AUDIO_OPTIONS=['Mono 1.0','Stereo 2.0','LPCM 2.0','LPCM 5.1','LPCM 7.1','Dolby Digital 2.0','Dolby Digital 5.1','Dolby Digital Plus 5.1','Dolby TrueHD 5.1','Dolby TrueHD 7.1','Dolby Atmos (TrueHD)','Dolby Atmos (Digital Plus)','DTS 5.1','DTS-HD High Resolution 7.1','DTS-HD Master Audio 5.1','DTS-HD Master Audio 7.1','DTS:X','Auro-3D'];
+const RC_AUDIO_OPTIONS=['Mono 1.0','Stereo 2.0','LPCM 1.0 Mono','LPCM 2.0','LPCM 2.0 Mono','LPCM 5.1','LPCM 7.1','Dolby Digital 1.0 Mono','Dolby Digital 2.0','Dolby Digital 2.0 Mono','Dolby Digital 5.1','Dolby Digital Plus 5.1','Dolby Digital Plus 7.1','Dolby TrueHD 2.0','Dolby TrueHD 5.1','Dolby TrueHD 7.1','Dolby Atmos','Dolby Atmos (TrueHD)','Dolby Atmos (Digital Plus)','DTS 2.0','DTS 2.0 Mono','DTS 5.1','DTS 6.1','DTS-HD High Resolution 2.0','DTS-HD High Resolution 5.1','DTS-HD High Resolution 7.1','DTS-HD Master Audio 1.0 Mono','DTS-HD Master Audio 2.0','DTS-HD Master Audio 2.0 Mono','DTS-HD Master Audio 5.1','DTS-HD Master Audio 7.1','DTS:X','Auro-3D'];
 const RC_HDR_OPTIONS=['HDR10','HDR10+','Dolby Vision'];
 function rcIs4k(format){return /4k|ultra\s*hd|uhd/i.test(String(format||''))}
 function rcArray(value){if(Array.isArray(value))return value.filter(x=>typeof x==='string');if(typeof value==='string'){try{const a=JSON.parse(value);if(Array.isArray(a))return a.filter(x=>typeof x==='string')}catch(e){}return value?[value]:[]}return []}
@@ -4370,7 +4370,7 @@ items=readLocal();render();fetchRemote();
    // De bestaande applicatie verzorgt opslag. Dit is alleen een vangnet voor de formulierweergave.
    const grid=row.querySelector('.add-film-grid');
    const fields=document.createElement('div');fields.className='rc-av-fields';
-   const audio=['Mono 1.0','Stereo 2.0','LPCM 2.0','LPCM 5.1','LPCM 7.1','Dolby Digital 2.0','Dolby Digital 5.1','Dolby Digital Plus 5.1','Dolby TrueHD 5.1','Dolby TrueHD 7.1','Dolby Atmos (TrueHD)','Dolby Atmos (Digital Plus)','DTS 5.1','DTS-HD High Resolution 7.1','DTS-HD Master Audio 5.1','DTS-HD Master Audio 7.1','DTS:X','Auro-3D'];
+   const audio=['Mono 1.0','Stereo 2.0','LPCM 1.0 Mono','LPCM 2.0','LPCM 2.0 Mono','LPCM 5.1','LPCM 7.1','Dolby Digital 1.0 Mono','Dolby Digital 2.0','Dolby Digital 2.0 Mono','Dolby Digital 5.1','Dolby Digital Plus 5.1','Dolby Digital Plus 7.1','Dolby TrueHD 2.0','Dolby TrueHD 5.1','Dolby TrueHD 7.1','Dolby Atmos','Dolby Atmos (TrueHD)','Dolby Atmos (Digital Plus)','DTS 2.0','DTS 2.0 Mono','DTS 5.1','DTS 6.1','DTS-HD High Resolution 2.0','DTS-HD High Resolution 5.1','DTS-HD High Resolution 7.1','DTS-HD Master Audio 1.0 Mono','DTS-HD Master Audio 2.0','DTS-HD Master Audio 2.0 Mono','DTS-HD Master Audio 5.1','DTS-HD Master Audio 7.1','DTS:X','Auro-3D'];
    const hdr=['HDR10','HDR10+','Dolby Vision'];
    const choices=(items,cls)=>items.map(v=>'<label><input type="checkbox" class="'+cls+'" value="'+v+'"><span>'+v+'</span></label>').join('');
    fields.innerHTML='<div><label>🔊 Sound (meerdere mogelijk)</label><div class="rc-av-options">'+choices(audio,'rc-audio-option')+'</div><label>Ander audioformaat (optioneel)</label><input class="rc-audio-other" placeholder="Bijv. PCM Mono"></div><div class="rc-hdr-fields"><label>✨ HDR op 4K (meerdere mogelijk)</label><div class="rc-av-options">'+choices(hdr,'rc-hdr-option')+'</div></div>';
@@ -4459,29 +4459,46 @@ items=readLocal();render();fetchRemote();
 (()=>{
  'use strict';
  function parse(text){
-  const s=String(text||'').replace(/\u00a0/g,' ').replace(/\s+/g,' ');
+  const raw=String(text||'').replace(/\u00a0/g,' ').replace(/&nbsp;/gi,' ').replace(/<br\s*\/?>/gi,'\n');
+  const s=raw.replace(/\s+/g,' ');
   const hdr=[];const audio=[];
   const add=(a,x)=>{if(!a.includes(x))a.push(x)};
   if(/dolby\s*vision/i.test(s))add(hdr,'Dolby Vision');
   if(/hdr\s*10\s*\+/i.test(s))add(hdr,'HDR10+');
   if(/hdr\s*10(?!\s*\+)/i.test(s))add(hdr,'HDR10');
-  const rules=[
-   [/dolby\s*atmos/i,'Dolby Atmos (TrueHD)'],
-   [/dolby\s*true\s*hd\s*7[.\s]*1/i,'Dolby TrueHD 7.1'],
-   [/dolby\s*true\s*hd\s*5[.\s]*1/i,'Dolby TrueHD 5.1'],
-   [/dts\s*[-:]?\s*x\b/i,'DTS:X'],
-   [/dts\s*[- ]?hd\s*master\s*audio\s*7[.\s]*1/i,'DTS-HD Master Audio 7.1'],
-   [/dts\s*[- ]?hd\s*master\s*audio\s*5[.\s]*1/i,'DTS-HD Master Audio 5.1'],
-   [/dts\s*[- ]?hd\s*high\s*resolution\s*7[.\s]*1/i,'DTS-HD High Resolution 7.1'],
-   [/dolby\s*digital\s*plus\s*5[.\s]*1/i,'Dolby Digital Plus 5.1'],
-   [/dolby\s*digital\s*5[.\s]*1/i,'Dolby Digital 5.1'],
-   [/dolby\s*digital\s*2[.\s]*0/i,'Dolby Digital 2.0'],
-   [/\b(?:lpcm|linear pcm)\s*7[.\s]*1/i,'LPCM 7.1'],
-   [/\b(?:lpcm|linear pcm)\s*5[.\s]*1/i,'LPCM 5.1'],
-   [/\b(?:lpcm|linear pcm)\s*2[.\s]*0/i,'LPCM 2.0'],
-   [/\bauro\s*[- ]?3d\b/i,'Auro-3D']
+  // Per audioregel herkennen, zodat een 5.1-track en een 2.0 Mono-track
+  // niet per ongeluk als één gecombineerd audioformaat worden gelezen.
+  const lines=raw.replace(/\b(English|Dutch|German|French|Italian|Spanish|Japanese|Korean|Portuguese|Mandarin|Cantonese)\s*:/gi,'\n$1:').split(/[\r\n|;]+/);
+  const codecs=[
+   [/\bdts\s*[-– ]?\s*hd\s*(?:master\s*audio|m\.?a\.?)\b/i,'DTS-HD Master Audio'],
+   [/\bdts\s*[-– ]?\s*hd\s*(?:high\s*resolution|h\.?r\.?)\b/i,'DTS-HD High Resolution'],
+   [/\bdolby\s*true\s*hd\b/i,'Dolby TrueHD'],
+   [/\bdolby\s*digital\s*(?:plus|\+)\b/i,'Dolby Digital Plus'],
+   [/\bdolby\s*digital\b|\bac\s*[-–]?\s*3\b/i,'Dolby Digital'],
+   [/\b(?:lpcm|linear\s*pcm|pcm)\b/i,'LPCM'],
+   [/\bdts\s*[-– ]?\s*hd\b/i,'DTS-HD'],
+   [/\bdts\b/i,'DTS']
   ];
-  rules.forEach(([re,val])=>{if(re.test(s))add(audio,val)});
+  for(const original of lines){
+   const line=original.replace(/\s+/g,' ').trim();
+   if(!line)continue;
+   if(/\bdts\s*[:\-]?\s*x\b/i.test(line)){add(audio,'DTS:X');continue;}
+   if(/\bauro\s*[-– ]?\s*3d\b/i.test(line)){add(audio,'Auro-3D');continue;}
+   if(/\bdolby\s*atmos\b/i.test(line)){
+    const carrier=/\b(?:dolby\s*digital\s*(?:plus|\+)|dd\s*\+)\b/i.test(line)?'Digital Plus':/\b(?:dolby\s*)?true\s*hd\b/i.test(line)?'TrueHD':'';
+    add(audio,carrier?'Dolby Atmos ('+carrier+')':'Dolby Atmos');
+    continue;
+   }
+   const codec=codecs.find(([pattern])=>pattern.test(line))?.[1];
+   const channelMatch=line.match(/(?:^|[^\d])([1-7]\s*[.,]\s*[0-6])\b/);
+   const channel=channelMatch?channelMatch[1].replace(/\s/g,'').replace(',','.'):'';
+   const mono=/\bmono(?:phonic)?\b/i.test(line);
+   const stereo=/\bstereo\b/i.test(line);
+   const suffix=channel?(channel==='1.0'?'1.0 Mono':channel==='2.0'&&mono?'2.0 Mono':channel==='2.0'&&stereo?'2.0 Stereo':channel):(mono?'1.0 Mono':stereo?'2.0 Stereo':'');
+   if(codec)add(audio,codec+(suffix?' '+suffix:''));
+   else if(mono)add(audio,channel==='2.0'?'2.0 Mono':'Mono 1.0');
+   else if(stereo)add(audio,'Stereo 2.0');
+  }
   return {hdr,audio};
  }
  function enhance(row){
@@ -4496,11 +4513,19 @@ items=readLocal();render();fetchRemote();
    const found=parse(text);if(!found.hdr.length&&!found.audio.length){msg.textContent='Geen herkenbare Sound- of HDR-formaten gevonden. Controleer of je de technische specificaties hebt gekopieerd.';return;}
    const choices=[...row.querySelectorAll('.rc-audio-option,.rc-hdr-option')];
    const available=choices.filter(c=>found.audio.includes(c.value)||found.hdr.includes(c.value));
+   const other=row.querySelector('.rc-audio-other');
+   const previousExtra=String(other?.value||'').split('·').map(x=>x.trim()).filter(Boolean);
    const current=choices.filter(c=>c.checked&&!available.includes(c));
-   if(current.length&&!confirm('Er staan al Sound/HDR-selecties ingevuld. De herkende gegevens toevoegen zonder bestaande selecties te verwijderen?'))return;
+   if((current.length||previousExtra.some(x=>!found.audio.includes(x)))&&!confirm('Er staan al Sound/HDR-selecties ingevuld. De herkende gegevens toevoegen zonder bestaande selecties te verwijderen?'))return;
    available.forEach(c=>{c.checked=true;c.dispatchEvent(new Event('change',{bubbles:true}));});
-   const missing=[...found.audio,...found.hdr].filter(x=>!available.some(c=>c.value===x));
-   msg.textContent='Overgenomen: '+[...found.audio,...found.hdr].join(' · ')+(missing.length?'\nNiet automatisch selecteerbaar: '+missing.join(', '):'')+'\nControleer de vakjes en klik daarna op Film opslaan. Audiotalen, ondertitels en beeldverhouding worden nog niet geïmporteerd.';
+   const extraAudio=found.audio.filter(x=>!available.some(c=>c.value===x));
+   if(other&&extraAudio.length){
+    other.value=[...new Set([...previousExtra,...extraAudio])].join(' · ');
+    other.dispatchEvent(new Event('input',{bubbles:true}));
+   }
+   const missingAudio=other?[]:extraAudio;
+   const missingHdr=found.hdr.filter(x=>!available.some(c=>c.value===x));
+   msg.textContent='Overgenomen: '+[...found.audio,...found.hdr].join(' · ')+(extraAudio.length&&other?'\nExtra audioformaten automatisch ingevuld bij "Ander audioformaat": '+extraAudio.join(', '):'')+([...missingAudio,...missingHdr].length?'\nNiet automatisch selecteerbaar: '+[...missingAudio,...missingHdr].join(', '):'')+'\nControleer de vakjes en klik daarna op Film opslaan. Audiotalen, ondertitels en beeldverhouding worden nog niet geïmporteerd.';
   };
  }
  function update(){document.querySelectorAll('#newFilmEditions .add-film-row').forEach(enhance)}
