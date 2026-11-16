@@ -79,8 +79,6 @@ nav button.active{background:#d9ed80;color:#182016;border-color:#d9ed80}
 .film-crew-photo img{width:100%;height:100%;object-fit:cover}
 .film-crew-person-name{font-size:13px;color:#f3f2eb;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
 .film-crew-person-job{font-size:11px;color:#c6c5b7;margin-top:4px;line-height:1.35}
-.film-crew-person-cta{display:inline-flex;align-items:center;gap:5px;color:#d3ae78;font-size:11px;font-weight:700;letter-spacing:.15px;margin-top:7px;border-bottom:1px solid rgba(211,174,120,.4);padding-bottom:2px;transition:color .18s,border-color .18s}
-.film-crew-person[type=button]:hover .film-crew-person-cta{color:#f1d9ac;border-bottom-color:#e5c58b}
 .film-crew-person[type=button]:focus-visible{outline:2px solid #d3ae78;outline-offset:2px}
 .film-crew-empty{color:#b9c0b7;font-size:12px;margin:3px 0}
 /* Filmwinkel: een fysieke film komt binnen, vóór het gewone toevoegformulier verschijnt. */
@@ -2677,7 +2675,7 @@ async function loadFilmCrew(f,detailId){
     const img=photoUrl(p);
     const canFilter=Number.isSafeInteger(Number(p.id))&&Number(p.id)>0;
     const tag=canFilter?'button':'div';
-    return `<${tag} ${canFilter?`type="button" data-crew-person="${Number(p.id)}" aria-label="Bekijk films van ${esc(p.name)}"`:''} class="film-crew-person"><span class="film-crew-photo">${img?`<img loading="lazy" src="${esc(img)}" alt="Portret van ${esc(p.name)}" onerror="this.replaceWith(document.createTextNode('◈'))">`:'◈'}</span><span><span class="film-crew-person-name">${esc(p.name)}</span>${p.job?`<span class="film-crew-person-job" style="display:block">${esc(p.job)}</span>`:''}${canFilter?'<span class="film-crew-person-cta">Bekijk mijn films <span aria-hidden="true">→</span></span>':''}</span></${tag}>`;
+    return `<${tag} ${canFilter?`type="button" data-crew-person="${Number(p.id)}" aria-label="Bekijk films van ${esc(p.name)}"`:''} class="film-crew-person"><span class="film-crew-photo">${img?`<img loading="lazy" src="${esc(img)}" alt="Portret van ${esc(p.name)}" onerror="this.replaceWith(document.createTextNode('◈'))">`:'◈'}</span><span><span class="film-crew-person-name">${esc(p.name)}</span>${p.job?`<span class="film-crew-person-job" style="display:block">${esc(p.job)}</span>`:''}</span></${tag}>`;
    }).join('');
    target.querySelectorAll('[data-crew-person]').forEach(card=>{
     const person=persons.find(p=>Number(p.id)===Number(card.dataset.crewPerson));
@@ -5018,9 +5016,17 @@ const root=$('rcGaps');if(!root)return;
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const norm=s=>String(s||'').toLocaleLowerCase('nl-NL').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').trim().replace(/^(the|a|an) /,'');
 const img=(path,size='w185')=>/^\/[\w/-]+\.(?:png|jpg|jpeg|webp)$/i.test(String(path||''))?'https://image.tmdb.org/t/p/'+size+path:'';
-const cacheKey='rc-gaps-tmdb-v1',ttl=21*86400000;
+// v2: behoud eerdere TMDB-ontdekkingen (sneller), maar voer de controle
+// op verzamelfilms opnieuw uit. De persoonlijke kaartvolgorde blijft staan.
+const cacheKey='rc-gaps-tmdb-v1',featureFilterVersion='zelfstandige-speelfilms-v2',ttl=21*86400000;
 let cache={movies:{},collections:{},directors:{},details:{},groups:{}};
-try{const saved=JSON.parse(localStorage.getItem(cacheKey)||'null');if(saved&&typeof saved==='object')for(const key of Object.keys(cache))cache[key]=saved[key]||{}}catch(_){}
+try{
+ const saved=JSON.parse(localStorage.getItem(cacheKey)||'null');
+ if(saved&&typeof saved==='object'){
+  for(const key of Object.keys(cache))cache[key]=saved[key]||{};
+  if(saved._featureFilterVersion!==featureFilterVersion){cache.details={};cache.groups={};}
+ }
+}catch(_){}
 // Los van de tijdelijke TMDB-cache: eigen kaartvolgorde blijft onbeperkt bewaard.
 const orderKey='rc-gaps-persoonlijke-volgorde-v1';
 let customOrder={franchise:[],director:[]};
@@ -5034,7 +5040,7 @@ function saveOrder(){
  catch(e){console.warn('Kaartvolgorde kan niet bewaard worden:',e);return false}
 }
 let saveTimer=0;
-function saveCache(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(cacheKey,JSON.stringify(cache))}catch(e){console.warn('Cache niet opgeslagen',e)}},600)}
+function saveCache(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(cacheKey,JSON.stringify({...cache,_featureFilterVersion:featureFilterVersion}))}catch(e){console.warn('Cache niet opgeslagen',e)}},600)}
 function get(bucket,key){const x=cache[bucket]?.[key];return x&&Date.now()-x.at<ttl?x.value:null}
 function put(bucket,key,value){cache[bucket][key]={at:Date.now(),value};saveCache()}
 async function api(action,body={}){
@@ -5195,7 +5201,10 @@ function render(){
  }).join('');
 }
 async function validateMovies(movies,groupKey){
- const unique=[...new Map(movies.filter(m=>Number(m.id)>0).map(m=>[Number(m.id),m])).values()];
+ // Deze titels zijn aantoonbaar bundels van korte films; houdt ze ook weg
+ // als de nieuwe Supabase-functie nog niet opnieuw is gedeployed.
+ const knownShortCompilation=m=>/\bjeonju digital project\b|\bdigital short films by (?:three|3) filmmakers\b/i.test(String(m.title||''));
+ const unique=[...new Map(movies.filter(m=>Number(m.id)>0&&!knownShortCompilation(m)).map(m=>[Number(m.id),m])).values()];
  const missing=unique.filter(m=>!get('details',m.id));
  for(let i=0;i<missing.length;i+=12){
   const chunk=missing.slice(i,i+12);
@@ -5339,7 +5348,14 @@ root.addEventListener('click',e=>{
 $('rcGapsSearch').oninput=e=>{query=e.target.value.trim();render()};
 $('rcGapsFilter').onchange=e=>{filter=e.target.value;render()};
 $('rcGapsMinOwned').onchange=e=>{minOwned=Number(e.target.value)||2;render()};
-$('rcGapsRetry').onclick=()=>{discoveryDone=false;discover()};
+$('rcGapsRetry').onclick=()=>{
+ if(discoveryRunning||loading.size){setStatus('Wacht even tot de huidige controle klaar is.');return}
+ // Vernieuw daadwerkelijk de beoordelingen van de films, niet alleen de
+ // franchise- en regisseursnamen. Handige herstelknop na een Edge-deploy.
+ cache.details={};cache.groups={};groupMovies.clear();unverifiedCounts.clear();errors.clear();saveCache();
+ discoveryDone=false;setStatus('Speelfilms en verzamelfilms opnieuw controleren…');
+ render();discover();autoExpand();
+};
 window.addEventListener('rc-wishlist-changed',event=>{
  if(activeMovie){
   const d=get('details','movie:'+activeMovie.id);renderMovie(activeMovie,d);
