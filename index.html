@@ -65,18 +65,21 @@ nav button.active{background:#d9ed80;color:#182016;border-color:#d9ed80}
 .cast-photo img{width:100%;height:100%;object-fit:cover}.cast-name{font-weight:650;font-size:12px;line-height:1.4;margin-top:8px}.cast-role{font-size:11px;color:#97a5b8;margin-top:3px}
 .cast-toggle{background:#202c3e;border:1px solid #3a4a60;color:#d9ed80;border-radius:7px;padding:9px 12px;cursor:pointer;font-size:12px}
 /* Filmcollectie: makers van de film, direct onder de acteurs. */
-.film-crew{margin-top:15px;background:linear-gradient(135deg,#0e2925,#101e20);border-color:#365d50}
+.film-crew{margin-top:15px;background:#161e2b;border-color:#2b3545}
 .film-crew>h3{color:#f2ede2;margin:0 0 15px;font-family:Georgia,serif;font-size:23px}
 .film-crew-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.film-crew-group{background:#10342d;border:1px solid #416252;border-radius:10px;padding:14px;min-width:0}
-.film-crew-group h4{font-size:15px;color:#e2d0a9;font-weight:750;margin:0 0 12px}
+.film-crew-group{background:#192333;border:1px solid #334052;border-radius:10px;padding:14px;min-width:0}
+.film-crew-group h4{font-size:15px;color:#e8edf5;font-weight:750;margin:0 0 12px}
 .film-crew-list{display:flex;flex-direction:column;gap:9px}
-.film-crew-person{display:flex;align-items:center;gap:11px;padding:8px;border-radius:8px;background:#0b2622;border:1px solid #315046;min-width:0}
-.film-crew-photo{width:48px;height:62px;flex:0 0 48px;border-radius:6px;object-fit:cover;background:#1c4037;display:flex;align-items:center;justify-content:center;color:#c3d3c8;font-size:23px;overflow:hidden}
+.film-crew-person{display:flex;align-items:center;gap:11px;padding:8px;border-radius:8px;background:#1a2839;border:1px solid #35475c;min-width:0}
+.film-crew-person[type=button]{width:100%;cursor:pointer;text-align:left;color:inherit;font:inherit;transition:border-color .18s,background .18s}
+.film-crew-person[type=button]:hover{border-color:#d9ed80;background:#24354a}
+.film-crew-person[type=button]:focus-visible{outline:2px solid #d9ed80;outline-offset:2px}
+.film-crew-photo{width:48px;height:62px;flex:0 0 48px;border-radius:6px;object-fit:cover;background:#283448;display:flex;align-items:center;justify-content:center;color:#c3cfdd;font-size:23px;overflow:hidden}
 .film-crew-photo img{width:100%;height:100%;object-fit:cover}
 .film-crew-person-name{font-size:13px;color:#f3f2eb;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
-.film-crew-person-job{font-size:11px;color:#bac9bf;margin-top:4px;line-height:1.35}
-.film-crew-empty{color:#adbbb3;font-size:12px;margin:3px 0}
+.film-crew-person-job{font-size:11px;color:#afbccd;margin-top:4px;line-height:1.35}
+.film-crew-empty{color:#a7b2c3;font-size:12px;margin:3px 0}
 @media(max-width:960px){.film-crew-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:580px){.film-crew-grid{grid-template-columns:1fr}.film-crew-group{padding:12px}}
 @media(max-width:760px){.film-detail-grid{grid-template-columns:112px minmax(0,1fr);gap:16px}.film-detail-grid .poster{max-width:112px}.film-detail-grid .details h2{font-size:26px}.film-rating-row{gap:6px}.film-rating-row .stat{padding:11px 8px}.film-rating-row .stat strong{font-size:22px}.film-detail-sections{grid-template-columns:1fr}.cast-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}}
@@ -1226,6 +1229,7 @@ function navigateBackFromDetail(){
 }
 /* RC: duidelijke, consistente overgang tussen de hoofdtabbladen. */
 let rcPersonFilterActive=false;
+let rcCrewFilter=null;
 let rcTransitionTimer=null;
 let rcTransitionToken=0;
 function show(v){
@@ -1290,7 +1294,7 @@ function showImmediate(v){
   requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:target,left:0,behavior:'auto'})));
   return;
  }
- if(v==='collection'&&$('personFilterBanner')&&!rcPersonFilterActive)$('personFilterBanner').hidden=true;if(v==='statistics')setTimeout(()=>{scheduleStatisticsMap();renderTopCharts()},0);if(v==='diary'){if(!diaryFilterNavigationPending)diaryFilterFilmId=null;diaryFilterNavigationPending=false;$('diaryBackFilm').hidden=diaryFilterFilmId===null;updateDiary();}if(v!=='diary'){$('diaryBackFilm').hidden=true;} document.querySelectorAll('.view').forEach(e=>e.classList.toggle('active',e.id===v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));window.scrollTo(0,0);if(v==='gaps')window.rcGapsOnShow?.();}document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{rcPersonFilterActive=false;if(b.dataset.view==='gaps')window.rcGapsReset?.();show(b.dataset.view)});$('back').onclick=navigateBackFromDetail;
+ if(v==='collection'&&$('personFilterBanner')&&!rcPersonFilterActive)$('personFilterBanner').hidden=true;if(v==='statistics')setTimeout(()=>{scheduleStatisticsMap();renderTopCharts()},0);if(v==='diary'){if(!diaryFilterNavigationPending)diaryFilterFilmId=null;diaryFilterNavigationPending=false;$('diaryBackFilm').hidden=diaryFilterFilmId===null;updateDiary();}if(v!=='diary'){$('diaryBackFilm').hidden=true;} document.querySelectorAll('.view').forEach(e=>e.classList.toggle('active',e.id===v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));window.scrollTo(0,0);if(v==='gaps')window.rcGapsOnShow?.();}document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{rcPersonFilterActive=false;if(rcCrewFilter){rcCrewFilter=null;$('search').value='';render();}if(b.dataset.view==='gaps')window.rcGapsReset?.();show(b.dataset.view)});$('back').onclick=navigateBackFromDetail;
 if('scrollRestoration' in history)history.scrollRestoration='manual';
 history.replaceState({rcFilmNavigation:true,view:'collection',filmId:null,scrollY:0},'');
 window.addEventListener('popstate',event=>{
@@ -1360,6 +1364,8 @@ function rcTechnicalBanner(){
  banner.append(title,clear);
 }
 function rcOpenTechnicalFilter(kind,value){
+ rcCrewFilter=null;rcPersonFilterActive=false;
+ if($('personFilterBanner'))$('personFilterBanner').hidden=true;
  rcTechnicalFilter={kind,value};
  selectedCountry='';
  for(const id of ['search','genre','format','watched','discFilter']){const node=document.getElementById(id);if(node)node.value='';}
@@ -1373,9 +1379,23 @@ document.addEventListener('click',event=>{
  event.preventDefault();
  rcOpenTechnicalFilter(badge.dataset.rcKind,badge.dataset.rcValue);
 });
+function rcCrewMatchesFilm(f){
+ if(!rcCrewFilter)return true;
+ if(rcCrewFilter.loading||rcCrewFilter.error)return false;
+ const id=Number(f._tmdbId);
+ if(Number.isSafeInteger(id)&&id>0)return rcCrewFilter.movieIds.has(id);
+ const year=String(f.year||'');
+ const names=[f.title,...(f.editions||[]).map(e=>e.title)].filter(Boolean);
+ return names.some(title=>rcCrewFilter.movieKeys.has(filmMatchKey(title)+'|'+year));
+}
 function render(){const q=$('search').value.toLocaleLowerCase(),g=$('genre').value,fmt=$('format').value,w=$('watched').value,d=$('discFilter').value;
 rcTechnicalBanner();
-let f=DATA.films.filter(f=>rcTechnicalMatches(f)&&(!selectedCountry||filmCountryCodes(f).includes(selectedCountry))&&(f.title+' '+f.director+' '+f.cast).toLocaleLowerCase().includes(q)&&(!g||String(f.genres||'').split(/\s*[|,;]\s*/).includes(g))&&(!fmt||f.editions.some(e=>String(e.format).includes(fmt)))&&(!w||(w==='seen'?(f.seen||filmHistory(f).length):!(f.seen||filmHistory(f).length)))&&(!d||(d==='seen'?hasPlayedEdition(f):d==='unseen'?!hasPlayedEdition(f):discGroups(f).some(x=>!x.seen))));
+if(rcCrewFilter?.loading||rcCrewFilter?.error){
+ $('count').textContent=rcCrewFilter.error?'Ophalen van filmcredits mislukt':'Films van '+rcCrewFilter.name+' ophalen…';
+ $('movies').innerHTML='<div class="empty">'+(rcCrewFilter.error?'De films van deze persoon konden niet worden opgehaald. Probeer het later opnieuw.':'Even geduld, de films worden opgezocht bij TMDB…')+'</div>';
+ return;
+}
+let f=DATA.films.filter(f=>rcCrewMatchesFilm(f)&&rcTechnicalMatches(f)&&(!selectedCountry||filmCountryCodes(f).includes(selectedCountry))&&(f.title+' '+f.director+' '+f.cast).toLocaleLowerCase().includes(q)&&(!g||String(f.genres||'').split(/\s*[|,;]\s*/).includes(g))&&(!fmt||f.editions.some(e=>String(e.format).includes(fmt)))&&(!w||(w==='seen'?(f.seen||filmHistory(f).length):!(f.seen||filmHistory(f).length)))&&(!d||(d==='seen'?hasPlayedEdition(f):d==='unseen'?!hasPlayedEdition(f):discGroups(f).some(x=>!x.seen))));
 const sort=$('sort').value;f.sort((a,b)=>{let v=0;if(sort==='runtime_desc'||sort==='runtime_asc'){
  const asc=sort==='runtime_asc';
  const av=collectionRuntimeForSort(a,asc),bv=collectionRuntimeForSort(b,asc);
@@ -1907,14 +1927,61 @@ function showFilmDiary(f){
   show('diary');
   // De animatie wisselt later pas van pagina; showImmediate rendert het filter.
 }
-function filterPerson(name,photo=''){
+const rcCrewFilmographyCache=new Map();
+async function rcLoadCrewFilmography(filter){
+ const key=filter.role+':'+filter.personId;
+ try{
+  if(!rcCrewFilmographyCache.has(key)){
+   const request=fetch(SUPABASE_URL+'/functions/v1/film-crew',{
+    method:'POST',
+    headers:{'apikey':SUPABASE_PUBLISHABLE_KEY,'Authorization':'Bearer '+SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},
+    body:JSON.stringify({action:'person-films',person_id:filter.personId,role:filter.role})
+   }).then(async response=>{
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||result.error)throw Error(result.error||'HTTP '+response.status);
+    return result;
+   });
+   rcCrewFilmographyCache.set(key,request);
+   request.catch(()=>rcCrewFilmographyCache.delete(key));
+  }
+  const result=await rcCrewFilmographyCache.get(key);
+  if(rcCrewFilter!==filter)return; // Intussen is op een andere persoon geklikt.
+  const movies=Array.isArray(result.movies)?result.movies:[];
+  filter.movieIds=new Set(movies.map(movie=>Number(movie.id)).filter(id=>Number.isSafeInteger(id)&&id>0));
+  filter.movieKeys=new Set();
+  movies.forEach(movie=>{
+   const year=String(movie.year||'');
+   for(const title of [movie.title,movie.original_title]){
+    const key=filmMatchKey(title);
+    if(key&&year)filter.movieKeys.add(key+'|'+year);
+   }
+  });
+  filter.loading=false;
+  render();
+ }catch(e){
+  if(rcCrewFilter!==filter)return;
+  filter.loading=false;filter.error=true;
+  console.warn('Filmografie voor deze maker niet beschikbaar:',e);
+  render();
+ }
+}
+function filterPerson(name,photo='',crew=null){
+ rcCrewFilter=crew&&Number.isSafeInteger(Number(crew.personId))&&Number(crew.personId)>0?{
+  name,role:crew.role,personId:Number(crew.personId),movieIds:new Set(),movieKeys:new Set(),loading:true,error:false
+ }:null;
  rcPersonFilterActive=true;
- show('collection');$('search').value=name;render();
+ if(rcCrewFilter){
+  rcTechnicalFilter=null;selectedCountry='';activeLabel='';
+  for(const id of ['genre','format','watched','discFilter'])$(id).value='';
+  if($('countryFilterBanner'))$('countryFilterBanner').hidden=true;
+ }
+ show('collection');$('search').value=rcCrewFilter?'':name;render();
  let banner=$('personFilterBanner');if(!banner){banner=document.createElement('div');banner.id='personFilterBanner';document.querySelector('#collection .toolbar').before(banner)}
  banner.innerHTML=`<div class="person-filter-info">${photo?`<img src="${esc(photo)}" alt="${esc(name)}">`:''}<div><small>FILMS IN MIJN COLLECTIE VAN</small><strong>${esc(name)}</strong></div><button id="clearPersonFilter" type="button">✕ Wis filter</button></div>`;
  banner.hidden=false;
  if(document.activeElement===$('search'))$('search').blur();
- $('clearPersonFilter').onclick=()=>{rcPersonFilterActive=false;banner.hidden=true;$('search').value='';render()};
+ $('clearPersonFilter').onclick=()=>{rcPersonFilterActive=false;rcCrewFilter=null;banner.hidden=true;$('search').value='';render()};
+ if(rcCrewFilter)rcLoadCrewFilmography(rcCrewFilter);
  // Na de pagina-overgang naar de personenbalk scrollen, niet naar de paginatop.
  // Hierdoor zie je de foto, filters en filmposters direct bij elkaar.
  setTimeout(()=>{
@@ -2298,6 +2365,8 @@ async function loadFilmCountries(f){
 }
 function countryButton(code){return `<button class="country-chip" type="button" data-country="${code}">${esc(countryName(code))} ${countryFlag(code)}</button>`}
 function selectCountry(code){
+ rcCrewFilter=null;rcPersonFilterActive=false;
+ if($('personFilterBanner'))$('personFilterBanner').hidden=true;
  selectedCountry=code;
  activeLabel='';
  $('search').value='';['genre','format','watched','discFilter'].forEach(id=>$(id).value='');
@@ -2502,7 +2571,7 @@ async function loadFilmCrew(f,detailId){
    const path=String(person.profile_path||'');
    return /^\/[\w/-]+\.(?:jpg|jpeg|png|webp)$/i.test(path)?'https://image.tmdb.org/t/p/w185'+path:'';
   };
-  const display=(targetId,people)=>{
+  const display=(targetId,people,role)=>{
    const target=panel.querySelector('#'+targetId);
    if(!target)return;
    const unique=new Set();
@@ -2515,12 +2584,18 @@ async function loadFilmCrew(f,detailId){
    if(!persons.length){target.innerHTML='<p class="film-crew-empty">Niet vermeld bij TMDB.</p>';return;}
    target.innerHTML=persons.map(p=>{
     const img=photoUrl(p);
-    return `<div class="film-crew-person"><span class="film-crew-photo">${img?`<img loading="lazy" src="${esc(img)}" alt="Portret van ${esc(p.name)}" onerror="this.replaceWith(document.createTextNode('◈'))">`:'◈'}</span><span><span class="film-crew-person-name">${esc(p.name)}</span>${p.job?`<span class="film-crew-person-job" style="display:block">${esc(p.job)}</span>`:''}</span></div>`;
+    const canFilter=Number.isSafeInteger(Number(p.id))&&Number(p.id)>0;
+    const tag=canFilter?'button':'div';
+    return `<${tag} ${canFilter?`type="button" data-crew-person="${Number(p.id)}" aria-label="Bekijk films van ${esc(p.name)}"`:''} class="film-crew-person"><span class="film-crew-photo">${img?`<img loading="lazy" src="${esc(img)}" alt="Portret van ${esc(p.name)}" onerror="this.replaceWith(document.createTextNode('◈'))">`:'◈'}</span><span><span class="film-crew-person-name">${esc(p.name)}</span>${p.job?`<span class="film-crew-person-job" style="display:block">${esc(p.job)}</span>`:''}${canFilter?'<span class="film-crew-person-job" style="display:block;color:#d9ed80;margin-top:5px">Bekijk mijn films →</span>':''}</span></${tag}>`;
    }).join('');
+   target.querySelectorAll('[data-crew-person]').forEach(card=>{
+    const person=persons.find(p=>Number(p.id)===Number(card.dataset.crewPerson));
+    if(person)card.onclick=()=>filterPerson(person.name,photoUrl(person),{personId:Number(person.id),role});
+   });
   };
-  display('filmCrewWriters',data.writers);
-  display('filmCrewCamera',data.cinematographers);
-  display('filmCrewMusic',data.composers);
+  display('filmCrewWriters',data.writers,'writer');
+  display('filmCrewCamera',data.cinematographers,'cinematographer');
+  display('filmCrewMusic',data.composers,'composer');
  }catch(e){
   if(activeDetailId!==detailId||!panel.isConnected||document.getElementById('filmCrew')!==panel)return;
   panel.querySelectorAll('.film-crew-list').forEach(target=>{target.innerHTML='<p class="film-crew-empty">Gegevens momenteel niet beschikbaar.</p>';});
@@ -2785,7 +2860,7 @@ for(const id of ['exportWatches','backupTest','restoreTest','resetTest']){
  const el=document.getElementById(id);if(el)el.hidden=true;
 }
 
-document.getElementById('clearFilters').addEventListener('click',()=>{for(const id of ['search','genre','format','watched','discFilter','sort']){const el=document.getElementById(id);if(el)el.value=id==='sort'?'title':'';}if(typeof render==='function')render();document.getElementById('search').focus();});
+document.getElementById('clearFilters').addEventListener('click',()=>{for(const id of ['search','genre','format','watched','discFilter','sort']){const el=document.getElementById(id);if(el)el.value=id==='sort'?'title':'';}rcCrewFilter=null;rcPersonFilterActive=false;rcTechnicalFilter=null;selectedCountry='';activeLabel='';for(const id of ['personFilterBanner','countryFilterBanner']){const el=document.getElementById(id);if(el)el.hidden=true;}if(typeof render==='function')render();document.getElementById('search').focus();});
 
 /* v40 — Supabase Auth login. Public browsing stays anonymous. */
 let adminSession=null;
