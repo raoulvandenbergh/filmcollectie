@@ -1427,7 +1427,7 @@ if(rcCrewFilter?.loading||rcCrewFilter?.error){
  $('movies').innerHTML='<div class="empty">'+(rcCrewFilter.error?'De films van deze persoon konden niet worden opgehaald. Probeer het later opnieuw.':'Even geduld, de films worden opgezocht bij TMDB…')+'</div>';
  return;
 }
-let f=DATA.films.filter(f=>rcCrewMatchesFilm(f)&&rcTechnicalMatches(f)&&(!selectedCountry||filmCountryCodes(f).includes(selectedCountry))&&(f.title+' '+f.director+' '+f.cast).toLocaleLowerCase().includes(q)&&(!g||String(f.genres||'').split(/\s*[|,;]\s*/).includes(g))&&(!fmt||f.editions.some(e=>String(e.format).includes(fmt)))&&(!w||(w==='seen'?(f.seen||filmHistory(f).length):!(f.seen||filmHistory(f).length)))&&(!d||(d==='seen'?hasPlayedEdition(f):d==='unseen'?!hasPlayedEdition(f):discGroups(f).some(x=>!x.seen))));
+let f=DATA.films.filter(f=>rcCrewMatchesFilm(f)&&rcTechnicalMatches(f)&&(!window.rcExtraFilterMatches||window.rcExtraFilterMatches(f))&&(!selectedCountry||filmCountryCodes(f).includes(selectedCountry))&&(f.title+' '+f.director+' '+f.cast).toLocaleLowerCase().includes(q)&&(!g||String(f.genres||'').split(/\s*[|,;]\s*/).includes(g))&&(!fmt||f.editions.some(e=>String(e.format).includes(fmt)))&&(!w||(w==='seen'?(f.seen||filmHistory(f).length):!(f.seen||filmHistory(f).length)))&&(!d||(d==='seen'?hasPlayedEdition(f):d==='unseen'?!hasPlayedEdition(f):discGroups(f).some(x=>!x.seen))));
 const sort=$('sort').value;f.sort((a,b)=>{let v=0;if(sort==='runtime_desc'||sort==='runtime_asc'){
  const asc=sort==='runtime_asc';
  const av=collectionRuntimeForSort(a,asc),bv=collectionRuntimeForSort(b,asc);
@@ -2903,6 +2903,7 @@ async function synchronizeCollection(){
   });
   window.__supabaseFilmIds=films.map(f=>f.id);
   window.rcBoxsetsDataReady?.();
+  window.rcExtraFiltersOnCollectionReady?.();
   window.rcGapsOnCollectionReady?.();
   diaryFilmIndex.clear(); DATA.films.forEach((f,i)=>diaryFilmIndex.set(String(f.title).trim().toLocaleLowerCase('nl-NL'),i));
   DATA.stats.films=DATA.films.length;
@@ -3404,7 +3405,7 @@ synchronizeCollection();
   row.querySelector('.remove-row-btn').onclick=()=>{if(el('newFilmCuts').children.length>1)row.remove();else status.textContent='Minimaal één versie is nodig.'};el('newFilmCuts').appendChild(row);
  }
  
-const RC_AUDIO_OPTIONS=['Mono 1.0','Stereo 2.0','LPCM 1.0 Mono','LPCM 2.0','LPCM 2.0 Mono','LPCM 5.1','LPCM 7.1','Dolby Digital 1.0 Mono','Dolby Digital 2.0','Dolby Digital 2.0 Mono','Dolby Digital 5.1','Dolby Digital Plus 5.1','Dolby Digital Plus 7.1','Dolby TrueHD 2.0','Dolby TrueHD 5.1','Dolby TrueHD 7.1','Dolby Atmos','Dolby Atmos (TrueHD)','Dolby Atmos (Digital Plus)','DTS 2.0','DTS 2.0 Mono','DTS 5.1','DTS 6.1','DTS-HD High Resolution 2.0','DTS-HD High Resolution 5.1','DTS-HD High Resolution 7.1','DTS-HD Master Audio 1.0 Mono','DTS-HD Master Audio 2.0','DTS-HD Master Audio 2.0 Mono','DTS-HD Master Audio 5.1','DTS-HD Master Audio 7.1','DTS:X','Auro-3D'];
+const RC_AUDIO_OPTIONS=['Mono 1.0','Stereo 2.0','LPCM 1.0 Mono','LPCM 2.0','LPCM 2.0 Mono','LPCM 5.1','LPCM 7.1','Dolby Digital 1.0 Mono','Dolby Digital 2.0','Dolby Digital 2.0 Mono','Dolby Digital 5.1','Dolby Digital Plus 5.1','Dolby Digital Plus 7.1','Dolby TrueHD 2.0','Dolby TrueHD 5.1','Dolby TrueHD 7.1','Dolby Atmos','Dolby Atmos (TrueHD)','Dolby Atmos (Digital Plus)','DTS 2.0','DTS 2.0 Mono','DTS 5.1','DTS 6.1','DTS-HD 5.1','DTS-HD 7.1','DTS-HD High Resolution 2.0','DTS-HD High Resolution 5.1','DTS-HD High Resolution 7.1','DTS-HD Master Audio 1.0 Mono','DTS-HD Master Audio 2.0','DTS-HD Master Audio 2.0 Mono','DTS-HD Master Audio 5.1','DTS-HD Master Audio 7.1','DTS:X','Auro-3D'];
 const RC_HDR_OPTIONS=['HDR10','HDR10+','Dolby Vision'];
 function rcIs4k(format){return /4k|ultra\s*hd|uhd/i.test(String(format||''))}
 function rcArray(value){if(Array.isArray(value))return value.filter(x=>typeof x==='string');if(typeof value==='string'){try{const a=JSON.parse(value);if(Array.isArray(a))return a.filter(x=>typeof x==='string')}catch(e){}return value?[value]:[]}return []}
@@ -4556,7 +4557,7 @@ items=readLocal();render();fetchRemote();
 /* Een enkele overgangsaansturing in JavaScript, geen overlappende animaties. */
 .view.active{animation:none!important}
 </style>
-<div id="rcAvBuildMarker" style="position:fixed;bottom:8px;left:8px;z-index:9998;background:#182b26;color:#f1d19b;border:1px solid #b08a55;border-radius:6px;padding:5px 9px;font:11px system-ui,sans-serif;pointer-events:none">RC Sound/HDR · herstelversie 3</div><script>
+<script>
 /* Controleversie: repareer ontbrekende audio/HDR-velden wanneer een editieformulier wordt opgebouwd. */
 (function(){
  const host=document.getElementById('newFilmEditions');
@@ -4567,7 +4568,7 @@ items=readLocal();render();fetchRemote();
    // De bestaande applicatie verzorgt opslag. Dit is alleen een vangnet voor de formulierweergave.
    const grid=row.querySelector('.add-film-grid');
    const fields=document.createElement('div');fields.className='rc-av-fields';
-   const audio=['Mono 1.0','Stereo 2.0','LPCM 1.0 Mono','LPCM 2.0','LPCM 2.0 Mono','LPCM 5.1','LPCM 7.1','Dolby Digital 1.0 Mono','Dolby Digital 2.0','Dolby Digital 2.0 Mono','Dolby Digital 5.1','Dolby Digital Plus 5.1','Dolby Digital Plus 7.1','Dolby TrueHD 2.0','Dolby TrueHD 5.1','Dolby TrueHD 7.1','Dolby Atmos','Dolby Atmos (TrueHD)','Dolby Atmos (Digital Plus)','DTS 2.0','DTS 2.0 Mono','DTS 5.1','DTS 6.1','DTS-HD High Resolution 2.0','DTS-HD High Resolution 5.1','DTS-HD High Resolution 7.1','DTS-HD Master Audio 1.0 Mono','DTS-HD Master Audio 2.0','DTS-HD Master Audio 2.0 Mono','DTS-HD Master Audio 5.1','DTS-HD Master Audio 7.1','DTS:X','Auro-3D'];
+   const audio=['Mono 1.0','Stereo 2.0','LPCM 1.0 Mono','LPCM 2.0','LPCM 2.0 Mono','LPCM 5.1','LPCM 7.1','Dolby Digital 1.0 Mono','Dolby Digital 2.0','Dolby Digital 2.0 Mono','Dolby Digital 5.1','Dolby Digital Plus 5.1','Dolby Digital Plus 7.1','Dolby TrueHD 2.0','Dolby TrueHD 5.1','Dolby TrueHD 7.1','Dolby Atmos','Dolby Atmos (TrueHD)','Dolby Atmos (Digital Plus)','DTS 2.0','DTS 2.0 Mono','DTS 5.1','DTS 6.1','DTS-HD 5.1','DTS-HD 7.1','DTS-HD High Resolution 2.0','DTS-HD High Resolution 5.1','DTS-HD High Resolution 7.1','DTS-HD Master Audio 1.0 Mono','DTS-HD Master Audio 2.0','DTS-HD Master Audio 2.0 Mono','DTS-HD Master Audio 5.1','DTS-HD Master Audio 7.1','DTS:X','Auro-3D'];
    const hdr=['HDR10','HDR10+','Dolby Vision'];
    const choices=(items,cls)=>items.map(v=>'<label><input type="checkbox" class="'+cls+'" value="'+v+'"><span>'+v+'</span></label>').join('');
    fields.innerHTML='<div><label>🔊 Sound (meerdere mogelijk)</label><div class="rc-av-options">'+choices(audio,'rc-audio-option')+'</div><label>Ander audioformaat (optioneel)</label><input class="rc-audio-other" placeholder="Bijv. PCM Mono"></div><div class="rc-hdr-fields"><label>✨ HDR op 4K (meerdere mogelijk)</label><div class="rc-av-options">'+choices(hdr,'rc-hdr-option')+'</div></div>';
@@ -5694,6 +5695,302 @@ render();
       else if(!overview.hidden)closeOverview();
     }
   });
+})();
+
+</script><script>
+/* RC Collectiefilters — eigen groene keuzemenu's, optionele extra filters en alle labels. */
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+  const key = s => String(s ?? '').trim().toLocaleLowerCase('nl-NL');
+  const values = s => String(s || '').split(/\s*[|;,]\s*/).map(s => s.trim()).filter(Boolean);
+  const labParts = s => String(s || '').split(/\s+·\s+|\s+\|\s+|;/).map(s => s.trim()).filter(Boolean);
+  const labelAlias = s => {
+    const value = key(s);
+    if(/\bwarner(?:\s*bros?\.?|\s*brothers|\s*home\s*video)/.test(value))return 'Warner Bros.';
+    if(/\bdisney\b|\bbuena\s*vista\b/.test(value))return 'Disney';
+    if(/\b20th\s*century\b|\btwentieth\s*century\b/.test(value))return '20th Century Studios';
+    if(/\bsony\b|\bcolumbia\s*pictures\b/.test(value))return 'Sony Pictures';
+    if(/\buniversal\b/.test(value))return 'Universal Pictures';
+    if(/\bparamount\b/.test(value))return 'Paramount';
+    if(/\bstudiocanal\b|\bstudio\s*canal\b/.test(value))return 'StudioCanal';
+    return String(s || '').trim();
+  };
+
+  const oldMatch = labelMatch;
+  labelMatch = function (label, name, edition = '') {
+    const desired = key(name);
+    if(desired === 'steelbooks')return oldMatch(label,name,edition);
+    const tokens = labParts(label);
+    if(tokens.some(s => key(labelAlias(s)) === desired))return true;
+    return oldMatch(label,name,edition);
+  };
+
+  // Naast gespecialiseerde labels ook de grote studio's en andere werkelijk
+  // ingevulde labels tonen. Oude labelwaarden in Supabase blijven ongewijzigd.
+  const majorLabels = [
+    'Warner Bros.','Disney','Universal Pictures','Paramount',
+    'Sony Pictures','20th Century Studios','Lionsgate','StudioCanal',
+    'Indicator','88 Films'
+  ];
+  const addLabels = names => {
+    const existing = new Set(labelNames.map(key));
+    for(const name of names){
+      const cleaned = String(name || '').trim();
+      if(!cleaned || cleaned.length > 70 || existing.has(key(cleaned)))continue;
+      existing.add(key(cleaned));labelNames.push(cleaned);
+    }
+  };
+  Object.assign(boutiqueSites,{
+    'Warner Bros.':'warnerbros.com','Disney':'disney.com',
+    'Universal Pictures':'universalpictures.com','Paramount':'paramount.com',
+    'Sony Pictures':'sonypictures.com','20th Century Studios':'20thcenturystudios.com',
+    'Lionsgate':'lionsgate.com','StudioCanal':'studiocanal.com'
+  });
+  addLabels(majorLabels);
+  document.querySelector('nav [data-view="labels"]')?.replaceChildren(document.createTextNode('Labels'));
+  const heading = document.querySelector('#labels .section-heading');
+  if(heading){
+    const lastText = [...heading.childNodes].reverse().find(n => n.nodeType === Node.TEXT_NODE);
+    if(lastText)lastText.textContent = 'Labels';
+  }
+  const subheading = document.querySelector('#labels .hero .muted');
+  if(subheading)subheading.textContent = 'Van Criterion en Eureka! tot Warner Bros. en Disney. Bekijk je films per label of studio.';
+
+  const style = document.createElement('style');
+  style.textContent = [
+    '#collection .toolbar{overflow:visible}',
+    '.rc-filter-wrap{position:relative;order:var(--rc-order,5);flex:0 1 auto;min-width:145px;max-width:230px}',
+    '.rc-filter-wrap .rc-native-select{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important;clip-path:inset(50%);padding:0!important;margin:0!important}',
+    '.rc-filter-trigger{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;height:44px;text-align:left;padding:8px 11px;border:1px solid #4b6d5c;border-radius:9px;background:linear-gradient(145deg,#0c2923,#173a30);color:#e8dac5;font:600 13px system-ui,sans-serif;cursor:pointer;transition:border-color .18s,background .18s}',
+    '.rc-filter-trigger:hover,.rc-filter-trigger[aria-expanded="true"]{border-color:#d5ae74;background:linear-gradient(145deg,#194438,#0b2a24)}',
+    '.rc-filter-trigger.is-selected{border-color:#c9aa77;color:#f6deaf}',
+    '.rc-filter-trigger .rc-menu-current{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.rc-filter-trigger .rc-filter-caret{font-size:13px;color:#d8b17b;transition:transform .18s}',
+    '.rc-filter-trigger[aria-expanded="true"] .rc-filter-caret{transform:rotate(180deg)}',
+    '.rc-filter-popover[hidden]{display:none!important}',
+    '.rc-filter-popover{position:absolute;left:0;top:calc(100% + 5px);z-index:4000;min-width:100%;width:max-content;max-width:min(330px,calc(100vw - 28px));max-height:320px;box-sizing:border-box;overflow:hidden;background:#0b251f;border:1px solid #b59460;border-radius:11px;padding:6px;box-shadow:0 18px 42px #000b}',
+    '.rc-filter-list{max-height:260px;overflow-y:auto;overscroll-behavior:contain;scrollbar-color:#8b7552 #113128}',
+    '.rc-filter-option{display:flex;align-items:center;gap:9px;width:100%;border:0;background:transparent;color:#e8e8dc;border-radius:7px;padding:10px 11px;font:500 13px system-ui,sans-serif;cursor:pointer;text-align:left;white-space:normal}',
+    '.rc-filter-option[hidden]{display:none!important}',
+    '.rc-filter-option:hover,.rc-filter-option:focus-visible{background:#214b3b;color:#fff4d4}',
+    '.rc-filter-option[aria-selected="true"]{background:#2a513f;color:#f4d59f;font-weight:750}',
+    '.rc-filter-option[aria-selected="true"]::before{content:"✓";color:#e4bf7a}',
+    '.rc-filter-query{display:block;width:100%;box-sizing:border-box;margin:2px 0 7px;border:1px solid #587563;background:#071b17;color:#f5eddf;border-radius:7px;padding:9px;font-size:13px}',
+    '.rc-filter-empty{color:#aab8ad;font-size:12px;padding:9px}',
+    '.rc-extra-filters-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:9px 0 17px}',
+    '.rc-more-filters-toggle{flex:0 0 auto;min-height:40px;border:1px solid #95764c;border-radius:9px;background:#102d26;color:#e2c293;padding:9px 13px;font:700 13px system-ui,sans-serif;cursor:pointer}',
+    '.rc-more-filters-toggle:hover,.rc-more-filters-toggle[aria-expanded="true"]{background:#1b4235}',
+    '.rc-more-filters-toggle.has-active{box-shadow:0 0 0 2px #d9b87870}',
+    '.rc-extra-filter-fields[hidden]{display:none!important}',
+    '.rc-extra-filter-fields{display:flex;align-items:flex-end;flex:1 1 520px;gap:10px;flex-wrap:wrap}',
+    '.rc-extra-filter-unit{min-width:150px;flex:1 1 150px;max-width:240px}',
+    '.rc-extra-filter-unit>small{display:block;color:#cfbc99;letter-spacing:.3px;margin-bottom:6px;font-size:11px;font-weight:700}',
+    '.rc-extra-filter-unit .rc-filter-wrap{min-width:0;max-width:none;width:100%}',
+    '@media(max-width:680px){.rc-filter-wrap{flex:1 1 135px;max-width:none}.rc-extra-filter-unit{min-width:135px;flex:1 1 135px;max-width:none}.rc-filter-popover{width:max(100%,220px)}.rc-extra-filters-bar{align-items:stretch}}'
+  ].join('\n');
+  document.head.appendChild(style);
+
+  const toolbar = document.querySelector('#collection .toolbar');
+  const extraBar = document.createElement('div');
+  extraBar.className = 'rc-extra-filters-bar';
+  extraBar.id = 'rcExtraFiltersBar';
+  extraBar.innerHTML =
+    '<button id="rcMoreFiltersToggle" class="rc-more-filters-toggle" type="button" aria-expanded="false" aria-controls="rcExtraFilterFields">＋ Meer filters <span id="rcExtraCount"></span></button>' +
+    '<div id="rcExtraFilterFields" class="rc-extra-filter-fields" hidden>' +
+    '<div class="rc-extra-filter-unit"><small>Gesproken taal</small><select id="rcFilterLanguage" aria-label="Filter op gesproken taal"><option value="">Alle talen</option></select></div>' +
+    '<div class="rc-extra-filter-unit"><small>Ondertiteling</small><select id="rcFilterSubtitles" aria-label="Filter op ondertiteling"><option value="">Alle ondertitels</option></select></div>' +
+    '<div class="rc-extra-filter-unit"><small>Label / studio</small><select id="rcFilterLabel" aria-label="Filter op label of studio"><option value="">Alle labels</option></select></div>' +
+    '</div>';
+  toolbar.after(extraBar);
+  const filterIds = ['rcFilterLanguage','rcFilterSubtitles','rcFilterLabel'];
+  let isOpen = false;
+  try{isOpen = localStorage.getItem('rcMoreFiltersExpandedV1') === 'true';}catch(_){}
+  function updateExpanded(){
+    $('rcExtraFilterFields').hidden = !isOpen;
+    $('rcMoreFiltersToggle').setAttribute('aria-expanded',String(isOpen));
+    $('rcMoreFiltersToggle').innerHTML = (isOpen?'− Minder filters':'＋ Meer filters') + ' <span id="rcExtraCount"></span>';
+    const active = filterIds.filter(id => $(id).value).length;
+    $('rcExtraCount').textContent = active ? '(' + active + ' actief)' : '';
+    $('rcMoreFiltersToggle').classList.toggle('has-active',active > 0);
+  }
+  $('rcMoreFiltersToggle').onclick = () => {
+    isOpen = !isOpen;updateExpanded();
+    try{localStorage.setItem('rcMoreFiltersExpandedV1',String(isOpen));}catch(_){}
+  };
+
+  window.rcExtraFilterMatches = film => {
+    const lang = $('rcFilterLanguage').value;
+    const sub = $('rcFilterSubtitles').value;
+    const label = $('rcFilterLabel').value;
+    return (!lang || values(film.language).some(s => key(s) === key(lang)))
+      && (!sub || values(film.subtitles).some(s => key(s) === key(sub)))
+      && (!label || (film.editions || []).some(e => labelMatch(e.label,label,e.edition)));
+  };
+  function resetExtraFilters(redraw = true){
+    for(const id of filterIds)$(id).value = '';
+    updateExpanded();
+    if(redraw)render();
+  }
+  window.rcExtraFiltersReset = resetExtraFilters;
+  $('clearFilters').addEventListener('click',() => resetExtraFilters(true));
+  $('labelCards').addEventListener('click',e => {
+    if(e.target.closest('.label-card'))resetExtraFilters(false);
+  },true);
+
+  // Makers- en Sound/HDR-filters moeten hun eigen resultaten kunnen tonen,
+  // zonder dat een eerder gekozen taal of label ze ongemerkt wegfiltert.
+  const oldPersonFilter = filterPerson;
+  filterPerson = function(...args){resetExtraFilters(false);return oldPersonFilter(...args);};
+  const oldTechnicalFilter = rcOpenTechnicalFilter;
+  rcOpenTechnicalFilter = function(...args){resetExtraFilters(false);return oldTechnicalFilter(...args);};
+
+  const pickers = [];
+  function closePicker(picker){
+    picker.panel.hidden = true;
+    picker.button.setAttribute('aria-expanded','false');
+  }
+  function closeAll(except){
+    for(const p of pickers)if(p !== except)closePicker(p);
+  }
+  function addPicker(select,order){
+    const wrapper = document.createElement('div');
+    wrapper.className = 'rc-filter-wrap';
+    wrapper.style.setProperty('--rc-order',String(order));
+    select.before(wrapper);
+    wrapper.appendChild(select);
+    select.classList.add('rc-native-select');
+    select.tabIndex = -1;
+    const button = document.createElement('button');
+    button.type = 'button';button.className = 'rc-filter-trigger';
+    button.setAttribute('aria-label',select.getAttribute('aria-label') || 'Filter '+select.id);
+    button.setAttribute('aria-expanded','false');
+    const current = document.createElement('span');
+    current.className = 'rc-menu-current';
+    const caret = document.createElement('span');
+    caret.className = 'rc-filter-caret';caret.textContent = '⌄';
+    button.append(current,caret);
+    const panel = document.createElement('div');
+    panel.className = 'rc-filter-popover';panel.hidden = true;
+    const list = document.createElement('div');
+    list.className = 'rc-filter-list';
+    panel.appendChild(list);
+    wrapper.append(button,panel);
+    const picker = {select,button,panel,list,current,search:null};
+    pickers.push(picker);
+    function sync(){
+      const options = [...select.options];
+      const chosen = options.find(o => o.value === select.value) || options[0];
+      current.textContent = chosen?.textContent || 'Kies filter';
+      button.classList.toggle('is-selected',Boolean(select.value && !(select.id === 'sort' && select.value === 'title')));
+      if(picker.optionsHash === options.map(o => o.value + '|' + o.textContent).join('\u001f') && picker.lastValue === select.value)return;
+      picker.optionsHash = options.map(o => o.value + '|' + o.textContent).join('\u001f');
+      picker.lastValue = select.value;
+      const prevSearch = picker.search?.value || '';
+      panel.replaceChildren();
+      picker.search = null;
+      if(options.length > 9){
+        const search = document.createElement('input');
+        search.className = 'rc-filter-query';search.type = 'search';
+        search.placeholder = 'Zoek in keuzes…';search.autocomplete = 'off';
+        search.setAttribute('data-lpignore','true');
+        search.value = prevSearch;
+        panel.appendChild(search);picker.search = search;
+      }
+      const choices = document.createElement('div');
+      choices.className = 'rc-filter-list';
+      for(const opt of options){
+        const item = document.createElement('button');
+        item.type = 'button';item.className = 'rc-filter-option';item.setAttribute('role','option');
+        item.setAttribute('aria-selected',String(opt.value === select.value));
+        item.dataset.value = opt.value;item.textContent = opt.textContent;
+        item.onclick = () => {
+          select.value = opt.value;closePicker(picker);
+          select.dispatchEvent(new Event('input',{bubbles:true}));
+          select.dispatchEvent(new Event('change',{bubbles:true}));
+          sync();updateExpanded();
+          button.focus();
+        };
+        choices.appendChild(item);
+      }
+      panel.appendChild(choices);
+      picker.list = choices;
+      if(picker.search){
+        const filter = () => {
+          const term = key(picker.search.value);
+          for(const item of choices.children)item.hidden = !key(item.textContent).includes(term);
+        };
+        picker.search.oninput = filter;
+        filter();
+      }
+    }
+    picker.sync = sync;
+    button.onclick = () => {
+      if(!panel.hidden){closePicker(picker);return;}
+      closeAll(picker);sync();panel.hidden = false;
+      button.setAttribute('aria-expanded','true');
+      if(picker.search)picker.search.focus();
+      else choicesFocus();
+    };
+    function choicesFocus(){
+      picker.list.querySelector('[aria-selected="true"]')?.focus();
+    }
+    button.onkeydown = e => {
+      if(e.key === 'ArrowDown' || e.key === ' '){e.preventDefault();if(panel.hidden)button.click();choicesFocus();}
+      if(e.key === 'Escape')closePicker(picker);
+    };
+    panel.addEventListener('keydown', e => {
+      if(e.key === 'Escape'){e.preventDefault();closePicker(picker);button.focus();return;}
+      if(e.key === 'ArrowDown' || e.key === 'ArrowUp'){
+        const shown = [...picker.list.querySelectorAll('.rc-filter-option:not([hidden])')];
+        const i = shown.indexOf(document.activeElement);
+        if(shown.length){e.preventDefault();shown[Math.max(0,Math.min(shown.length-1,i + (e.key === 'ArrowDown' ? 1 : -1)))].focus();}
+      }
+    });
+    select.addEventListener('input',sync);
+    select.addEventListener('change',sync);
+    new MutationObserver(sync).observe(select,{childList:true,subtree:true,characterData:true});
+    sync();
+    return picker;
+  }
+  const order = {genre:2,format:3,watched:4,discFilter:5,sort:6};
+  for(const id of Object.keys(order))addPicker($(id),order[id]);
+  for(const id of filterIds){
+    const picker = addPicker($(id),1);
+    $(id).addEventListener('input',()=>{if(id === 'rcFilterLabel')activeLabel = '';render();picker.sync();updateExpanded();});
+  }
+  document.addEventListener('pointerdown',e => {
+    if(!e.target.closest('.rc-filter-wrap'))closeAll();
+  });
+  document.addEventListener('keydown',e => {if(e.key === 'Escape')closeAll();});
+
+  function populate(id,empty,entries){
+    const select = $(id),before = select.value;
+    select.replaceChildren();
+    const first = document.createElement('option');first.value = '';first.textContent = empty;select.appendChild(first);
+    for(const item of entries){
+      const opt = document.createElement('option');opt.value = item;opt.textContent = item;select.appendChild(opt);
+    }
+    select.value = entries.some(v => v === before) ? before : '';
+  }
+  function rebuildData(){
+    const extraNames = DATA.films.flatMap(f => (f.editions || []).flatMap(e => labParts(e.label).map(labelAlias)));
+    addLabels(extraNames.slice().sort((a,b)=>a.localeCompare(b,'nl')));
+    renderLabels();
+    const uniqueValues = property => [...new Set(DATA.films.flatMap(f => values(f[property])))].sort((a,b)=>a.localeCompare(b,'nl'));
+    populate('rcFilterLanguage','Alle talen',uniqueValues('language'));
+    populate('rcFilterSubtitles','Alle ondertitels',uniqueValues('subtitles'));
+    populate('rcFilterLabel','Alle labels',labelNames.filter(name => filmsForLabel(name).length > 0));
+    for(const picker of pickers)picker.sync();
+    updateExpanded();
+  }
+  window.rcExtraFiltersOnCollectionReady = rebuildData;
+  const originalRender = render;
+  render = function(...args){const result = originalRender(...args);for(const picker of pickers)picker.sync();updateExpanded();return result;};
+  rebuildData();
 })();
 
 </script></body></html>
