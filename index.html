@@ -5947,7 +5947,10 @@ render();
     '.rc-extra-filters-bar{display:contents}',
     '#collection .toolbar .rc-filter-action-stack{display:flex;flex-direction:column;align-items:stretch;gap:6px;order:1;min-width:105px}',
     '#collection .toolbar .rc-filter-action-stack #clearFilters{order:0;margin:0;height:44px;white-space:nowrap}',
-    '.rc-more-filters-toggle{flex:0 0 auto;min-height:38px;border:1px solid #95764c;border-radius:9px;background:#102d26;color:#e2c293;padding:8px 10px;font:700 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap}',
+    '.rc-more-filters-toggle{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;flex:0 0 auto;width:100%;min-width:0;height:38px;min-height:38px;box-sizing:border-box;overflow:hidden;border:1px solid #95764c;border-radius:9px;background:#102d26;color:#e2c293;padding:3px 5px;font:700 11px/13px system-ui,sans-serif;cursor:pointer;white-space:nowrap}',
+    '.rc-more-filters-toggle .rc-more-filters-title{display:block;max-width:100%;white-space:nowrap;font-size:12px;line-height:13px}',
+    '.rc-more-filters-toggle .rc-extra-count{display:block;max-width:100%;font-size:10px;line-height:12px;font-weight:600;color:#e2c293;white-space:nowrap}',
+    '.rc-more-filters-toggle .rc-extra-count:empty{display:none}',
     '.rc-more-filters-toggle:hover,.rc-more-filters-toggle[aria-expanded="true"]{background:#1b4235}',
     '.rc-more-filters-toggle.has-active{box-shadow:0 0 0 2px #d9b87870}',
     '.rc-extra-filter-fields[hidden]{display:none!important}',
@@ -5978,7 +5981,7 @@ render();
   $('clearFilters').before(actionStack);
   actionStack.appendChild($('clearFilters'));
   actionStack.insertAdjacentHTML('beforeend',
-    '<button id="rcMoreFiltersToggle" class="rc-more-filters-toggle" type="button" aria-expanded="false" aria-controls="rcExtraFilterFields">＋ Meer filters <span id="rcExtraCount"></span></button>');
+    '<button id="rcMoreFiltersToggle" class="rc-more-filters-toggle" type="button" aria-expanded="false" aria-controls="rcExtraFilterFields"><span class="rc-more-filters-title">＋ Meer filters</span><span id="rcExtraCount" class="rc-extra-count"></span></button>');
   toolbar.appendChild(extraBar);
   const filterIds = ['rcFilterLanguage','rcFilterSubtitles','rcFilterLabel'];
   let isOpen = false;
@@ -5986,9 +5989,10 @@ render();
   function updateExpanded(){
     $('rcExtraFilterFields').hidden = !isOpen;
     $('rcMoreFiltersToggle').setAttribute('aria-expanded',String(isOpen));
-    $('rcMoreFiltersToggle').innerHTML = (isOpen?'− Minder filters':'＋ Meer filters') + ' <span id="rcExtraCount"></span>';
+    $('rcMoreFiltersToggle').querySelector('.rc-more-filters-title').textContent = isOpen ? '− Minder filters' : '＋ Meer filters';
     const active = filterIds.filter(id => $(id).value).length;
     $('rcExtraCount').textContent = active ? '(' + active + ' actief)' : '';
+    $('rcMoreFiltersToggle').setAttribute('aria-label',(isOpen?'Minder filters':'Meer filters')+(active ? ', '+active+' actief' : ''));
     $('rcMoreFiltersToggle').classList.toggle('has-active',active > 0);
   }
   $('rcMoreFiltersToggle').onclick = () => {
