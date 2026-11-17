@@ -1947,6 +1947,7 @@ $('resetTest').onclick=()=>{if(!confirm('Alle kijkbeurten en ratings die je in d
 $('restoreTest').onclick=()=>$('restoreFile').click();
 $('restoreFile').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;try{const data=JSON.parse(await file.text());if(data.format!=='the-film-archive-test-backup'||data.version!==1||!Array.isArray(data.extraWatches)||!data.extraWatches.every(x=>x&&typeof x.title==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x.date))||!data.ratingOverrides||typeof data.ratingOverrides!=='object'||Array.isArray(data.ratingOverrides))throw new Error('Ongeldig back-upbestand');if(!confirm('De huidige testgegevens vervangen door de gegevens uit deze back-up?'))return;localStorage.setItem(WATCH_KEY,JSON.stringify(data.extraWatches));localStorage.setItem(RATING_KEY,JSON.stringify(data.ratingOverrides));extraWatches=data.extraWatches;ratingOverrides=data.ratingOverrides;updateDiary();updateCounts();render();if(activeDetailId>=0)detail(DATA.films[activeDetailId]);$('testToolStatus').textContent='Back-up teruggezet.'}catch(err){$('testToolStatus').textContent='Terugzetten mislukt: '+err.message}finally{e.target.value=''}};
 let activeDetailId=-1;
+let rcPersonReturnFilm=null;
 function formatOneDecimal(value){const n=Number(value);return String(value??'').trim()!==''&&Number.isFinite(n)?n.toLocaleString('nl-NL',{minimumFractionDigits:1,maximumFractionDigits:1}):'–';}
 // Open een zoekpagina voor de juiste titel en jaartal; we hebben nog geen betrouwbare externe film-IDs in de import.
 function imdbFilmUrl(f){return f._imdbId?'https://www.imdb.com/title/'+encodeURIComponent(f._imdbId)+'/':'https://www.imdb.com/find/?q='+encodeURIComponent(f.title+' '+(f.year||''))+'&s=tt';}
@@ -1998,6 +1999,10 @@ async function rcLoadCrewFilmography(filter){
  }
 }
 function filterPerson(name,photo='',crew=null){
+ // Bewaar de film vanwaar op de maker werd geklikt, ook na Supabase-verversing.
+ const openedFromFilm=document.getElementById('detail')?.classList.contains('active')&&activeDetailId>=0;
+ const origin=openedFromFilm?DATA.films[activeDetailId]:null;
+ rcPersonReturnFilm=origin?{filmId:window.__supabaseFilmIds?.[activeDetailId]||null,index:activeDetailId,title:origin.title,scrollY:window.scrollY}:null;
  rcCrewFilter=crew&&Number.isSafeInteger(Number(crew.personId))&&Number(crew.personId)>0?{
   name,role:crew.role,personId:Number(crew.personId),movieIds:new Set(),movieKeys:new Set(),loading:true,error:false
  }:null;
@@ -2009,10 +2014,20 @@ function filterPerson(name,photo='',crew=null){
  }
  show('collection');$('search').value=rcCrewFilter?'':name;render();
  let banner=$('personFilterBanner');if(!banner){banner=document.createElement('div');banner.id='personFilterBanner';document.querySelector('#collection .toolbar').before(banner)}
- banner.innerHTML=`<div class="person-filter-info">${photo?`<img src="${esc(photo)}" alt="${esc(name)}">`:''}<div><small>FILMS IN MIJN COLLECTIE VAN</small><strong>${esc(name)}</strong></div><button id="clearPersonFilter" type="button">✕ Wis filter</button></div>`;
+ banner.innerHTML=`<div class="person-filter-info">${photo?`<img src="${esc(photo)}" alt="${esc(name)}">`:''}<div><small>FILMS IN MIJN COLLECTIE VAN</small><strong>${esc(name)}</strong></div><div class="rc-person-filter-actions">${rcPersonReturnFilm?`<button id="returnToPersonFilm" type="button">← Terug naar ${esc(rcPersonReturnFilm.title)}</button>`:''}<button id="clearPersonFilter" type="button">✕ Wis filter</button></div></div>`;
  banner.hidden=false;
  if(document.activeElement===$('search'))$('search').blur();
- $('clearPersonFilter').onclick=()=>{rcPersonFilterActive=false;rcCrewFilter=null;banner.hidden=true;$('search').value='';render()};
+ $('clearPersonFilter').onclick=()=>{rcPersonFilterActive=false;rcCrewFilter=null;rcPersonReturnFilm=null;banner.hidden=true;$('search').value='';render()};
+ const returnButton=$('returnToPersonFilm');
+ if(returnButton)returnButton.onclick=()=>{
+  const saved=rcPersonReturnFilm;if(!saved)return;
+  const index=saved.filmId?window.__supabaseFilmIds?.indexOf(saved.filmId):saved.index;
+  const film=DATA.films[index];if(!film)return;
+  rcPersonFilterActive=false;rcCrewFilter=null;rcPersonReturnFilm=null;
+  banner.hidden=true;$('search').value='';render();
+  detail(film);show('detail');
+  setTimeout(()=>window.scrollTo({top:saved.scrollY,left:0,behavior:'auto'}),660);
+ };
  if(rcCrewFilter)rcLoadCrewFilmography(rcCrewFilter);
  // Na de pagina-overgang naar de personenbalk scrollen, niet naar de paginatop.
  // Hierdoor zie je de foto, filters en filmposters direct bij elkaar.
@@ -2383,6 +2398,8 @@ function detail(f){
  ? (watchCounts.editions.get(String(f.editions[0].dbId))||0)+Number(f.editions[0].watchOffset||0)
  : (watchCounts.cuts.get(cutName(c.title,f.title).toLocaleLowerCase('nl-NL'))||0)+Number(c.watchOffset||0)),discGroups(f).some(g=>g.name===cutName(c.title,f.title)&&g.seen))}${esc(displayFilmTitle(c.title))}${c.runtimes.length?' ('+c.runtimes.map(n=>n+' min').join(' / ')+')':''}</div>`).join('')}</section></div>
  <section class="panel film-director"><h3>🎥 Regisseur${rcDirectorNames(f.director).length>1?'s':''}</h3><div id="directorCards" class="rc-director-cards">${rcDirectorNames(f.director).map((name,i)=>`<button type="button" class="director-card" data-director-index="${i}"><span class="director-photo" ${i===0?'id="directorPhoto"':''} style="display:flex;align-items:center;justify-content:center">◈</span><span><strong>${esc(name)}</strong><small>Bekijk films van deze regisseur →</small></span></button>`).join('')}</div></section><section class="panel film-cast"><div class="film-cast-head"><h3 style="margin:0">🎭 Acteurs</h3><button class="cast-toggle" id="castToggle" style="display:none">Toon volledige cast</button></div><div class="cast-grid" id="castGrid"></div><p class="muted" id="castInfo" style="font-size:12px;margin-bottom:0"></p></section><section class="panel country-panel"><h3>🌍 Landen van herkomst</h3><div class="country-chips" id="filmCountryChips"><span class="country-hint">Productielanden ophalen…</span></div></section>${rcAVShowcase(f.editions||[])}`;
+ // Een box-set verschijnt alleen bij films waarvan een fysieke uitgave eraan gekoppeld is.
+ window.rcBoxsetsRenderFilm?.(f);
  // Sound en HDR horen direct bij de fysieke uitgaven, vóór de regisseurs.
  const discPanels=$('detailBody').querySelector('.film-detail-sections');
  const audioVideo=$('detailBody').querySelector('.rc-av-showcase');
@@ -2861,7 +2878,10 @@ const originalFilmInfo=new Map(DATA.films.map(f=>[String(f.title).trim().toLocal
 async function synchronizeCollection(){
  let indicator=document.getElementById('supabaseSync');if(!indicator){indicator=document.createElement('p');indicator.id='supabaseSync';indicator.className='watch-note';document.getElementById('count').after(indicator)}indicator.textContent='Collectie synchroniseren met Supabase…';
  try{
-  const [films,editions,filmCuts,editionCuts]=await Promise.all([loadPublicTable('films'),loadPublicTable('editions'),loadPublicTable('film_cuts'),loadPublicTable('edition_cuts')]);
+  // De nieuwe set-tabel is optioneel totdat de eenmalige SQL-migratie is uitgevoerd.
+  const [films,editions,filmCuts,editionCuts,physicalSets]=await Promise.all([loadPublicTable('films'),loadPublicTable('editions'),loadPublicTable('film_cuts'),loadPublicTable('edition_cuts'),loadPublicTable('physical_sets').catch(()=>null)]);
+  window.__rcPhysicalSetsReady=Array.isArray(physicalSets);
+  window.__rcPhysicalSets=Array.isArray(physicalSets)?physicalSets:[];
   if(!films.length)throw new Error('De tabel films is leeg');
   const byFilm=new Map();
   for(const ed of editions){if(!byFilm.has(ed.film_id))byFilm.set(ed.film_id,[]);byFilm.get(ed.film_id).push(ed)}
@@ -2878,10 +2898,11 @@ async function synchronizeCollection(){
     _priorWatches:Number(f.prior_watch_count??0),
     spotifyUrl:f.spotify_url||'',
     cuts:(cutsByFilm.get(f.id)||[]).map(c=>({dbId:c.id,title:c.name,runtime:c.runtime,watchOffset:Number(c.watch_offset||0)})),
-    editions:(byFilm.get(f.id)||[]).map(e=>({dbId:e.id,title:e.title||f.title,format:e.format||'',edition:e.edition||'',label:e.label||'',runtime:e.runtime,watchOffset:Number(e.watch_offset||0),audio_formats:rcArray(e.audio_formats),hdr_formats:rcArray(e.hdr_formats),cutIds:cutIdsByEdition.get(e.id)||[],discSeen:!!e.disc_seen||(/star wars.*return of the jedi/i.test(f.title)&&cutName(e.title,f.title)==='Standaardversie')}))
+    editions:(byFilm.get(f.id)||[]).map(e=>({dbId:e.id,title:e.title||f.title,format:e.format||'',edition:e.edition||'',label:e.label||'',runtime:e.runtime,watchOffset:Number(e.watch_offset||0),physicalSetId:e.physical_set_id||null,audio_formats:rcArray(e.audio_formats),hdr_formats:rcArray(e.hdr_formats),cutIds:cutIdsByEdition.get(e.id)||[],discSeen:!!e.disc_seen||(/star wars.*return of the jedi/i.test(f.title)&&cutName(e.title,f.title)==='Standaardversie')}))
    };
   });
   window.__supabaseFilmIds=films.map(f=>f.id);
+  window.rcBoxsetsDataReady?.();
   window.rcGapsOnCollectionReady?.();
   diaryFilmIndex.clear(); DATA.films.forEach((f,i)=>diaryFilmIndex.set(String(f.title).trim().toLocaleLowerCase('nl-NL'),i));
   DATA.stats.films=DATA.films.length;
@@ -3579,7 +3600,7 @@ function addEdition(existing=null){
   if(!val('newFilmSubtitles')){status.textContent='Vul de ondertiteling van jouw uitgave in (of Geen).';return}
   const cutRows=[...el('newFilmCuts').querySelectorAll('.add-film-row')];const cuts=cutRows.map(r=>({title:r.querySelector('.cut-title').value.trim()||title,runtime:Number(r.querySelector('.cut-runtime').value),dbId:r.dataset.dbId||null,manual:r.querySelector('.cut-watches').value}));
   if(cuts.some(c=>!Number.isInteger(c.runtime)||c.runtime<1)){status.textContent='Vul voor iedere versie een geldige speelduur in.';return}
-  const editions=[...el('newFilmEditions').querySelectorAll('.add-film-row')].map(r=>({format:r.querySelector('.edition-format').value,edition:r.querySelector('.edition-type').value.trim()||'Standaard',label:[...r.querySelectorAll('.edition-label')].map(i=>i.value.trim()).filter(Boolean).filter((v,i,a)=>a.findIndex(x=>x.toLocaleLowerCase('nl')===v.toLocaleLowerCase('nl'))===i).join(' · '),cutIndices:[...r.querySelector('.edition-cut').selectedOptions].map(o=>Number(o.value)),manual:r.querySelector('.edition-watches').value,audio_formats:rcAudioValues(r),hdr_formats:rcIs4k(r.querySelector('.edition-format').value)?rcAVValues(r,'rc-hdr-option'):[]}));
+  const editions=[...el('newFilmEditions').querySelectorAll('.add-film-row')].map(r=>({format:r.querySelector('.edition-format').value,edition:r.querySelector('.edition-type').value.trim()||'Standaard',label:[...r.querySelectorAll('.edition-label')].map(i=>i.value.trim()).filter(Boolean).filter((v,i,a)=>a.findIndex(x=>x.toLocaleLowerCase('nl')===v.toLocaleLowerCase('nl'))===i).join(' · '),cutIndices:[...r.querySelector('.edition-cut').selectedOptions].map(o=>Number(o.value)),manual:r.querySelector('.edition-watches').value,physicalSetId:r.querySelector('.rc-boxset-select')?r.querySelector('.rc-boxset-select').value||null:undefined,audio_formats:rcAudioValues(r),hdr_formats:rcIs4k(r.querySelector('.edition-format').value)?rcAVValues(r,'rc-hdr-option'):[]}));
   if(editions.some(e=>!e.cutIndices.length)){status.textContent='Koppel aan iedere uitgave minimaal één cut.';return}
   // Eén uitgave en één cut hebben altijd hetzelfde zichtbare aantal.
   // De uitgave is hierbij leidend, zodat een oude cut-correctie niet terugkomt.
@@ -3648,6 +3669,7 @@ function addEdition(existing=null){
     const offset=e.manual!==''?Number(e.manual)-currentCount:Number(old?.watchOffset||0);
     if(!Number.isSafeInteger(offset)||offset< -100000||offset>100000)throw Error('Ongeldig aantal kijkbeurten bij een uitgave.');
     const payload={title:c.title,format:e.format,edition:e.edition,label:e.label,runtime:c.runtime,watch_offset:offset,audio_formats:e.audio_formats,hdr_formats:e.hdr_formats};
+    if(window.__rcPhysicalSetsReady&&e.physicalSetId!==undefined)payload.physical_set_id=e.physicalSetId;
     const saved=row.dataset.dbId?await adminRest('editions','PATCH',payload,token,'?id=eq.'+encodeURIComponent(row.dataset.dbId)):await adminRest('editions','POST',{...payload,film_id:filmId,disc_seen:false},token);
     const edId=saved?.[0]?.id;if(!edId)throw Error('Uitgave kon niet worden opgeslagen.');
     if(e.manual!=='')desiredEditionCounts.push({id:edId,count:Number(e.manual)});
@@ -5365,6 +5387,313 @@ window.addEventListener('rc-wishlist-changed',event=>{
 });
 new MutationObserver(()=>{if(activeMovie)renderMovie(activeMovie,get('details','movie:'+activeMovie.id))}).observe($('adminToggle'),{childList:true});
 render();
+})();
+
+</script><script>
+/* RC Box-sets — herbruikbare fysieke sets; geen wijzigingen aan kijkbeurten. */
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const safe = value => String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[char]));
+  const records = () => Array.isArray(window.__rcPhysicalSets) ? window.__rcPhysicalSets : [];
+  const isReady = () => window.__rcPhysicalSetsReady === true;
+  const getSet = id => records().find(set => String(set.id) === String(id));
+  const allRows = () => [...document.querySelectorAll('#newFilmEditions .add-film-row')];
+  const imageMarkup = (url, title, cls = '') => {
+    let valid = '';
+    try { const parsed = new URL(String(url || '')); if(parsed.protocol === 'https:') valid = parsed.href; } catch (_) {}
+    return valid
+      ? '<img class="' + cls + '" src="' + safe(valid) + '" alt="Cover van ' + safe(title) + '" loading="lazy" onerror="this.style.display=\'none\'">'
+      : '<span class="rc-set-no-cover" aria-hidden="true">▣</span>';
+  };
+
+  const style = document.createElement('style');
+  style.textContent = [
+    '.rc-person-filter-actions{display:flex!important;flex-direction:row!important;flex:0 1 auto!important;align-items:center;gap:8px!important;min-width:0}',
+    '.rc-person-filter-actions button{white-space:normal!important;line-height:1.2}',
+    '.rc-boxset-field{grid-column:1/-1;margin:4px 0 5px;padding:12px 13px;border:1px solid rgba(191,166,117,.3);border-radius:10px;background:rgba(8,41,35,.7)}',
+    '.rc-boxset-field label{color:#dec49a!important;margin:0 0 7px!important;font-weight:700}',
+    '.rc-boxset-field small{display:block;color:#adbcaf;margin-top:6px;font-size:12px}',
+    '.rc-boxset-formline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}',
+    '.rc-boxset-formline select{flex:1 1 230px;min-width:0}',
+    '.rc-boxset-formline button{border:1px solid #8f7750;background:#15352d;color:#e4c9a1;padding:9px 11px;border-radius:8px;cursor:pointer}',
+    '.rc-boxset-formline button:disabled{opacity:.45;cursor:not-allowed}',
+    '.rc-set-display{border-top:1px solid rgba(186,159,110,.28);margin-top:17px;padding-top:13px}',
+    '.rc-set-display-title{color:#e1bd81;font:700 18px Georgia,serif;margin-bottom:11px}',
+    '.rc-set-display-list{display:flex;gap:12px;flex-wrap:wrap}',
+    '.rc-set-card{display:flex;align-items:center;text-align:left;gap:12px;border:1px solid rgba(193,168,118,.48);background:linear-gradient(110deg,#0b2924,#15372f);color:#f0e7d7;border-radius:11px;padding:10px;cursor:pointer;min-width:210px;max-width:100%;flex:1 1 230px}',
+    '.rc-set-card:hover,.rc-set-movie:hover{border-color:#dfbd7c;transform:translateY(-2px)}',
+    '.rc-set-card-cover{width:74px;height:92px;border-radius:6px;background:#17392f;display:grid;place-items:center;overflow:hidden;flex-shrink:0}',
+    '.rc-set-card-cover img{width:100%;height:100%;object-fit:cover}',
+    '.rc-set-no-cover{font-size:36px;color:#d5b27f}',
+    '.rc-set-card strong{display:block;font-family:Georgia,serif;color:#f0d8af;font-size:17px}',
+    '.rc-set-card small{display:block;color:#b7c2b5;margin-top:6px;font-size:12px}',
+    '.rc-set-overlay[hidden]{display:none!important}',
+    '.rc-set-overlay{position:fixed;inset:0;background:rgba(0,11,10,.84);z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(5px)}',
+    '.rc-set-dialog{background:linear-gradient(145deg,#09231f,#102e27);color:#e9e0cf;border:1px solid #92794f;border-radius:16px;box-shadow:0 24px 90px rgba(0,0,0,.65);width:min(580px,100%);max-height:90vh;overflow-y:auto;padding:24px}',
+    '.rc-set-dialog-wide{width:min(840px,100%)}',
+    '.rc-set-dialog h2{font:700 clamp(24px,3vw,32px) Georgia,serif;color:#edd4aa;margin:0 0 9px}',
+    '.rc-set-dialog p{color:#bbc8bc;font-size:14px;line-height:1.6}',
+    '.rc-set-dialog label{display:block;font-size:13px;font-weight:700;color:#e3c69a;margin-top:15px}',
+    '.rc-set-dialog input{display:block;box-sizing:border-box;width:100%;background:#081f1c;border:1px solid #5c7767;color:#fff;border-radius:8px;padding:12px;margin-top:7px;font:inherit}',
+    '.rc-set-dialog input[type=file]{font-size:13px}',
+    '.rc-set-dialog-footer{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:20px}',
+    '.rc-set-dialog-footer button{padding:11px 16px;border:1px solid #96794c;border-radius:9px;background:#152e27;color:#eed7ac;cursor:pointer;font-weight:700}',
+    '.rc-set-dialog-footer .rc-set-primary{background:#b9925c;color:#0c241e}',
+    '.rc-set-preview{width:112px;height:145px;background:#102d25;display:grid;place-items:center;border-radius:9px;overflow:hidden;margin-top:10px;border:1px solid #476655}',
+    '.rc-set-preview img{width:100%;height:100%;object-fit:cover}',
+    '.rc-set-status{min-height:20px;color:#e0b67c!important;margin:10px 0 0!important}',
+    '.rc-set-movies{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px;margin:18px 0}',
+    '.rc-set-movie{display:flex;flex-direction:column;gap:8px;text-align:left;color:#eee3d0;background:#0c2822;border:1px solid #486254;border-radius:10px;padding:9px;cursor:pointer;transition:transform .18s,border-color .18s}',
+    '.rc-set-movie-poster{display:grid;place-items:center;aspect-ratio:2/3;background:#1a3832;border-radius:6px;overflow:hidden;color:#d3b489;text-align:center;padding:5px;box-sizing:border-box}',
+    '.rc-set-movie-poster img{width:100%;height:100%;object-fit:cover}',
+    '.rc-set-movie strong{font-size:13px;line-height:1.3}',
+    '.rc-set-movie small{color:#a8bdaf}',
+    '@media(max-width:710px){.person-filter-info{flex-wrap:wrap}.rc-person-filter-actions{width:100%;flex:1 0 100%!important}.rc-set-dialog{padding:17px}.rc-set-card{min-width:0}}'
+  ].join('\n');
+  document.head.appendChild(style);
+
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="rcSetEditor" class="rc-set-overlay" hidden><div class="rc-set-dialog" role="dialog" aria-modal="true" aria-labelledby="rcSetEditorTitle">' +
+    '<h2 id="rcSetEditorTitle">Nieuwe box-set</h2><p>Geef deze fysieke set een naam en eventueel een afbeelding. Daarna kun je meerdere films aan dezelfde set koppelen.</p>' +
+    '<label for="rcSetName">Naam van de set *</label><input id="rcSetName" maxlength="160" autocomplete="off" placeholder="Bijv. Akira Kurosawa Collection">' +
+    '<label for="rcSetCoverUrl">Link naar afbeelding (optioneel)</label><input id="rcSetCoverUrl" type="url" autocomplete="off" placeholder="https://…/cover.jpg">' +
+    '<label for="rcSetCoverFile">Of upload een foto van jouw box-set (maximaal 5 MB)</label><input id="rcSetCoverFile" type="file" accept="image/jpeg,image/png,image/webp">' +
+    '<div id="rcSetPreview" class="rc-set-preview"><span class="rc-set-no-cover">▣</span></div>' +
+    '<p id="rcSetEditorStatus" class="rc-set-status" role="status" aria-live="polite"></p>' +
+    '<div class="rc-set-dialog-footer"><button id="rcSetEditorCancel" type="button">Annuleren</button><button id="rcSetEditorSave" type="button" class="rc-set-primary">Set bewaren</button></div>' +
+    '</div></div>' +
+    '<div id="rcSetOverview" class="rc-set-overlay" hidden><div class="rc-set-dialog rc-set-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="rcSetOverviewTitle">' +
+    '<h2 id="rcSetOverviewTitle">Mijn box-set</h2><p id="rcSetOverviewIntro"></p><div id="rcSetOverviewMovies" class="rc-set-movies"></div>' +
+    '<div class="rc-set-dialog-footer"><button id="rcSetOverviewEdit" type="button">✎ Set bewerken</button><button id="rcSetOverviewClose" type="button" class="rc-set-primary">Sluiten</button></div></div></div>'
+  );
+
+  let activeEditId = null;
+  let onSaved = null;
+  let tempUrl = null;
+  const editor = $('rcSetEditor');
+  const overview = $('rcSetOverview');
+  const preview = $('rcSetPreview');
+  const clearTempUrl = () => {
+    if(tempUrl) URL.revokeObjectURL(tempUrl);
+    tempUrl = null;
+  };
+  const showPreview = url => {
+    preview.replaceChildren();
+    if(!url){preview.innerHTML = '<span class="rc-set-no-cover">▣</span>';return;}
+    const img = document.createElement('img');
+    img.src = url;img.alt = 'Voorbeeld setcover';
+    img.onerror = () => { preview.innerHTML = '<span class="rc-set-no-cover">▣</span>'; };
+    preview.appendChild(img);
+  };
+  const closeEditor = () => {
+    editor.hidden = true;activeEditId = null;onSaved = null;clearTempUrl();
+    $('rcSetCoverFile').value = '';
+  };
+  const openEditor = (id = null, callback = null) => {
+    if(!isReady()){alert('Voer eerst de box-set SQL uit in Supabase en vernieuw de website.');return;}
+    const set = id ? getSet(id) : null;
+    if(id && !set){alert('Deze set is nog niet beschikbaar. Vernieuw de pagina.');return;}
+    activeEditId = set?.id || null;
+    onSaved = callback;
+    $('rcSetEditorTitle').textContent = set ? 'Box-set bewerken' : 'Nieuwe box-set';
+    $('rcSetName').value = set?.name || '';
+    $('rcSetCoverUrl').value = set?.cover_url || '';
+    $('rcSetCoverFile').value = '';
+    $('rcSetEditorStatus').textContent = '';
+    clearTempUrl();showPreview(set?.cover_url || '');
+    editor.hidden = false;
+    $('rcSetName').focus();
+  };
+  $('rcSetEditorCancel').onclick = closeEditor;
+  editor.addEventListener('click', e => { if(e.target === editor)closeEditor(); });
+  $('rcSetCoverUrl').addEventListener('input', e => {
+    if(!$('rcSetCoverFile').files?.length)showPreview(e.target.value.trim());
+  });
+  $('rcSetCoverFile').addEventListener('change', e => {
+    clearTempUrl();
+    const file = e.target.files?.[0];
+    tempUrl = file ? URL.createObjectURL(file) : null;
+    showPreview(tempUrl || $('rcSetCoverUrl').value.trim());
+  });
+
+  async function uploadCover(file, token) {
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw Error('Gebruik JPG, PNG of WebP.');
+    if(file.size > 5 * 1024 * 1024)throw Error('De afbeelding mag maximaal 5 MB groot zijn.');
+    const ext = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
+    const path = String(adminSession.user_id) + '/' + crypto.randomUUID() + '.' + ext;
+    const upload = await fetch(SUPABASE_URL + '/storage/v1/object/rc-boxset-covers/' + path, {
+      method:'POST',
+      headers:{'apikey':SUPABASE_PUBLISHABLE_KEY,'Authorization':'Bearer ' + token,'Content-Type':file.type,'Cache-Control':'3600'},
+      body:file
+    });
+    if(!upload.ok){
+      const err = await upload.json().catch(() => ({}));
+      throw Error('Cover uploaden mislukt: ' + (err.message || err.error || 'HTTP ' + upload.status));
+    }
+    return SUPABASE_URL + '/storage/v1/object/public/rc-boxset-covers/' + path;
+  }
+  $('rcSetEditorSave').onclick = async () => {
+    const name = $('rcSetName').value.trim();
+    const file = $('rcSetCoverFile').files?.[0];
+    let cover = $('rcSetCoverUrl').value.trim();
+    if(!name){$('rcSetEditorStatus').textContent = 'Geef de set eerst een naam.';return;}
+    if(cover){
+      try{if(new URL(cover).protocol !== 'https:')throw Error();}catch(_){
+        $('rcSetEditorStatus').textContent = 'Gebruik een veilige https-link voor de cover.';return;
+      }
+    }
+    const button = $('rcSetEditorSave');
+    button.disabled = true;$('rcSetEditorStatus').textContent = 'Set opslaan…';
+    try{
+      const token = await adminAccessToken();
+      if(file)cover = await uploadCover(file,token);
+      const data = {name,cover_url:cover || null};
+      const saved = activeEditId
+        ? await adminRest('physical_sets','PATCH',data,token,'?id=eq.' + encodeURIComponent(activeEditId))
+        : await adminRest('physical_sets','POST',data,token);
+      const record = saved?.[0];
+      if(!record?.id)throw Error('Supabase heeft de set niet bevestigd.');
+      const index = records().findIndex(set => set.id === record.id);
+      if(index >= 0)records().splice(index,1,record);else records().push(record);
+      const callback = onSaved;
+      closeEditor();refreshAll();
+      if(typeof callback === 'function')callback(record.id);
+      const f = DATA.films[activeDetailId];
+      if(f && $('detail').classList.contains('active'))renderFilm(f);
+      if(!overview.hidden)openOverview(record.id);
+    }catch(error){
+      $('rcSetEditorStatus').textContent = 'Opslaan mislukt: ' + error.message;
+    }finally{button.disabled = false;}
+  };
+
+  function refreshSelect(select, initialId) {
+    const selected = initialId !== undefined ? initialId : select.value;
+    const available = isReady();
+    const options = [
+      '<option value="">Geen set (losse uitgave)</option>',
+      ...records().slice().sort((a,b) => a.name.localeCompare(b.name,'nl')).map(set =>
+        '<option value="' + safe(set.id) + '">' + safe(set.name) + '</option>'),
+      '<option value="__new">＋ Nieuwe box-set aanmaken…</option>'
+    ];
+    select.innerHTML = options.join('');
+    select.value = selected && getSet(selected) ? selected : '';
+    select.disabled = !available;
+    const row = select.closest('.rc-boxset-field');
+    const edit = row?.querySelector('.rc-boxset-edit');
+    const add = row?.querySelector('.rc-boxset-add');
+    const hint = row?.querySelector('.rc-boxset-hint');
+    if(edit)edit.disabled = !available || !select.value;
+    if(add)add.disabled = !available;
+    if(hint)hint.textContent = available
+      ? 'Dezelfde set kun je bij meerdere films kiezen. Een losse uitgave blijft gewoon bestaan.'
+      : 'Eerst de bijgeleverde SQL uitvoeren in Supabase, daarna de website vernieuwen.';
+  }
+  function enhanceRow(row) {
+    if(row.dataset.rcBoxsetAdded || !row.querySelector('.add-film-grid'))return;
+    row.dataset.rcBoxsetAdded = '1';
+    const stored = row.dataset.dbId
+      ? DATA.films[activeDetailId]?.editions?.find(e => String(e.dbId) === String(row.dataset.dbId))?.physicalSetId
+      : null;
+    const block = document.createElement('div');
+    block.className = 'rc-boxset-field';
+    block.innerHTML = '<label>Behoort deze fysieke uitgave tot een box-set?</label>' +
+      '<div class="rc-boxset-formline"><select class="rc-boxset-select" aria-label="Box-set kiezen"></select>' +
+      '<button type="button" class="rc-boxset-add">＋ Nieuwe set</button>' +
+      '<button type="button" class="rc-boxset-edit">✎ Bewerken</button></div>' +
+      '<small class="rc-boxset-hint"></small>';
+    row.querySelector('.add-film-grid').appendChild(block);
+    const select = block.querySelector('select');
+    refreshSelect(select,stored);
+    select.onchange = () => {
+      if(select.value === '__new'){
+        select.value = '';refreshSelect(select);
+        openEditor(null,id => {refreshSelect(select,id);});
+      } else refreshSelect(select);
+    };
+    block.querySelector('.rc-boxset-add').onclick = () => openEditor(null,id => refreshSelect(select,id));
+    block.querySelector('.rc-boxset-edit').onclick = () => {if(select.value)openEditor(select.value);};
+  }
+  function refreshAll() {
+    for(const row of allRows()){
+      enhanceRow(row);
+      const select = row.querySelector('.rc-boxset-select');
+      if(select && row.dataset.rcBoxsetAdded)refreshSelect(select);
+    }
+  }
+  const editionList = $('newFilmEditions');
+  if(editionList)new MutationObserver(() => {
+    allRows().filter(row => !row.dataset.rcBoxsetAdded).forEach(enhanceRow);
+  }).observe(editionList,{childList:true});
+  refreshAll();
+  window.rcBoxsetsDataReady = () => {
+    refreshAll();
+    const film = DATA.films[activeDetailId];
+    if(film && $('detail').classList.contains('active'))renderFilm(film);
+  };
+
+  function renderFilm(film) {
+    const panel = $('detailBody')?.querySelector('.film-detail-sections > .panel:first-child');
+    if(!panel)return;
+    panel.querySelector('.rc-set-display')?.remove();
+    const ids = [...new Set((film.editions || []).map(e => e.physicalSetId).filter(Boolean))];
+    const linked = ids.map(getSet).filter(Boolean);
+    if(!linked.length)return;
+    const block = document.createElement('div');
+    block.className = 'rc-set-display';
+    block.innerHTML = '<div class="rc-set-display-title">▣ Set</div><div class="rc-set-display-list">' +
+      linked.map(set => {
+        const count = DATA.films.filter(f => (f.editions || []).some(e => e.physicalSetId === set.id)).length;
+        return '<button type="button" class="rc-set-card" data-set-id="' + safe(set.id) + '">' +
+          '<span class="rc-set-card-cover">' + imageMarkup(set.cover_url,set.name) + '</span><span>' +
+          '<strong>' + safe(set.name) + '</strong><small>' + count + ' film' + (count === 1 ? '' : 's') +
+          ' in deze set · Bekijk alle films →</small></span></button>';
+      }).join('') + '</div>';
+    panel.appendChild(block);
+  }
+  window.rcBoxsetsRenderFilm = renderFilm;
+  $('detailBody')?.addEventListener('click',e => {
+    const card = e.target.closest('.rc-set-card');
+    if(card)openOverview(card.dataset.setId);
+  });
+
+  function openOverview(id) {
+    const set = getSet(id);if(!set)return;
+    const movies = DATA.films.filter(f => (f.editions || []).some(e => e.physicalSetId === id));
+    $('rcSetOverviewTitle').textContent = set.name;
+    $('rcSetOverviewIntro').textContent = 'Alle films die je fysiek bezit in deze set (' + movies.length + '). Tik op een poster om die film te openen.';
+    $('rcSetOverviewMovies').innerHTML = movies.length
+      ? movies.map(f => {
+        const index = DATA.films.indexOf(f);
+        const image = posterCache[index] || f.poster_url || '';
+        return '<button type="button" class="rc-set-movie" data-film-index="' + index + '">' +
+          '<span class="rc-set-movie-poster">' +
+          (image ? imageMarkup(image,f.title) : safe(f.title)) + '</span>' +
+          '<strong>' + safe(f.title) + '</strong><small>' + safe(f.year || '') + '</small></button>';
+      }).join('')
+      : '<p>Nog geen films gekoppeld. Kies deze set bij een fysieke uitgave en sla de film op.</p>';
+    $('rcSetOverviewEdit').hidden = !window.__filmAdminSignedIn;
+    $('rcSetOverviewEdit').onclick = () => openEditor(id);
+    overview.hidden = false;
+  }
+  const closeOverview = () => {overview.hidden = true;};
+  $('rcSetOverviewClose').onclick = closeOverview;
+  overview.addEventListener('click', e => {if(e.target === overview)closeOverview();});
+  $('rcSetOverviewMovies').addEventListener('click', e => {
+    const target = e.target.closest('[data-film-index]');if(!target)return;
+    const movie = DATA.films[Number(target.dataset.filmIndex)];if(!movie)return;
+    closeOverview();detail(movie);
+    if(!$('detail').classList.contains('active'))show('detail');
+    else window.scrollTo({top:0,left:0,behavior:'auto'});
+  });
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape'){
+      if(!editor.hidden)closeEditor();
+      else if(!overview.hidden)closeOverview();
+    }
+  });
 })();
 
 </script></body></html>
