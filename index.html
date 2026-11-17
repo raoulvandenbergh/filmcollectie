@@ -5452,6 +5452,18 @@ render();
     '.rc-set-movie-poster img{width:100%;height:100%;object-fit:cover}',
     '.rc-set-movie strong{font-size:13px;line-height:1.3}',
     '.rc-set-movie small{color:#a8bdaf}',
+    '.rc-set-dialog-footer [hidden]{display:none!important}',
+    '.rc-set-dialog-footer #rcSetOverviewOrder{margin-right:auto}',
+    '.rc-set-movie-order{cursor:grab;position:relative;touch-action:pan-y}',
+    '.rc-set-movie-order:active{cursor:grabbing}',
+    '.rc-set-movie-order.rc-set-dragging{opacity:.45}',
+    '.rc-set-movie-order.rc-set-drop-target{border-color:#e7bf7f;background:#194338}',
+    '.rc-set-order-actions{display:flex;align-items:center;gap:7px;margin-top:auto;padding-top:4px}',
+    '.rc-set-order-actions button{flex:1;min-height:34px;border:1px solid #9b8058;border-radius:7px;background:#16382f;color:#f2d6a5;font-size:17px;cursor:pointer}',
+    '.rc-set-order-actions button:hover{background:#2a4c3c}',
+    '.rc-set-order-actions button:disabled{opacity:.3;cursor:default}',
+    '.rc-set-order-hint{color:#dfc39b!important}',
+    '.rc-set-order-status{color:#e4c39a!important;min-height:18px;margin:6px 0!important}',
     '@media(max-width:710px){.person-filter-info{flex-wrap:wrap}.rc-person-filter-actions{width:100%;flex:1 0 100%!important}.rc-set-dialog{padding:17px}.rc-set-card{min-width:0}}'
   ].join('\n');
   document.head.appendChild(style);
@@ -5468,11 +5480,21 @@ render();
     '</div></div>' +
     '<div id="rcSetOverview" class="rc-set-overlay" hidden><div class="rc-set-dialog rc-set-dialog-wide" role="dialog" aria-modal="true" aria-labelledby="rcSetOverviewTitle">' +
     '<h2 id="rcSetOverviewTitle">Mijn box-set</h2><p id="rcSetOverviewIntro"></p><div id="rcSetOverviewMovies" class="rc-set-movies"></div>' +
-    '<div class="rc-set-dialog-footer"><button id="rcSetOverviewEdit" type="button">✎ Set bewerken</button><button id="rcSetOverviewClose" type="button" class="rc-set-primary">Sluiten</button></div></div></div>'
+    '<p id="rcSetOrderStatus" class="rc-set-order-status" role="status" aria-live="polite" hidden></p>' +
+    '<div class="rc-set-dialog-footer"><button id="rcSetOverviewOrder" type="button">↕ Volgorde aanpassen</button>' +
+    '<button id="rcSetOverviewEdit" type="button">✎ Set bewerken</button>' +
+    '<button id="rcSetOrderCancel" type="button" hidden>Annuleren</button>' +
+    '<button id="rcSetOrderSave" type="button" class="rc-set-primary" hidden>✓ Volgorde opslaan</button>' +
+    '<button id="rcSetOverviewClose" type="button" class="rc-set-primary">Sluiten</button></div></div></div>'
   );
 
   let activeEditId = null;
   let onSaved = null;
+  let editorReturnSetId = null;
+  let overviewSetId = null;
+  let isOrdering = false;
+  let orderDraft = [];
+  let orderSaving = false;
   let tempUrl = null;
   const editor = $('rcSetEditor');
   const overview = $('rcSetOverview');
@@ -5489,16 +5511,21 @@ render();
     img.onerror = () => { preview.innerHTML = '<span class="rc-set-no-cover">▣</span>'; };
     preview.appendChild(img);
   };
-  const closeEditor = () => {
+  const closeEditor = (restoreOverview = true) => {
+    const returnId = editorReturnSetId;
+    editorReturnSetId = null;
     editor.hidden = true;activeEditId = null;onSaved = null;clearTempUrl();
     $('rcSetCoverFile').value = '';
+    if(restoreOverview && returnId)openOverview(returnId);
   };
-  const openEditor = (id = null, callback = null) => {
+  const openEditor = (id = null, callback = null, fromOverview = false) => {
     if(!isReady()){alert('Voer eerst de box-set SQL uit in Supabase en vernieuw de website.');return;}
     const set = id ? getSet(id) : null;
     if(id && !set){alert('Deze set is nog niet beschikbaar. Vernieuw de pagina.');return;}
     activeEditId = set?.id || null;
     onSaved = callback;
+    editorReturnSetId = fromOverview ? set?.id || null : null;
+    if(fromOverview)overview.hidden = true;
     $('rcSetEditorTitle').textContent = set ? 'Box-set bewerken' : 'Nieuwe box-set';
     $('rcSetName').value = set?.name || '';
     $('rcSetCoverUrl').value = set?.cover_url || '';
@@ -5560,11 +5587,12 @@ render();
       const index = records().findIndex(set => set.id === record.id);
       if(index >= 0)records().splice(index,1,record);else records().push(record);
       const callback = onSaved;
-      closeEditor();refreshAll();
+      const returnToOverview = Boolean(editorReturnSetId);
+      closeEditor(false);refreshAll();
       if(typeof callback === 'function')callback(record.id);
       const f = DATA.films[activeDetailId];
       if(f && $('detail').classList.contains('active'))renderFilm(f);
-      if(!overview.hidden)openOverview(record.id);
+      if(returnToOverview)openOverview(record.id);
     }catch(error){
       $('rcSetEditorStatus').textContent = 'Opslaan mislukt: ' + error.message;
     }finally{button.disabled = false;}
@@ -5660,39 +5688,163 @@ render();
     if(card)openOverview(card.dataset.setId);
   });
 
-  function openOverview(id) {
-    const set = getSet(id);if(!set)return;
-    const movies = DATA.films.filter(f => (f.editions || []).some(e => e.physicalSetId === id));
+  // Sorteer met de opgeslagen Supabase-volgorde; nieuw gekoppelde films komen achteraan.
+  const filmKey = film => String(window.__supabaseFilmIds?.[DATA.films.indexOf(film)] ?? 'index:' + DATA.films.indexOf(film));
+  const moviesForSet = id => {
+    const set = getSet(id);
+    const savedOrder = Array.isArray(set?.film_order) ? set.film_order.map(String) : [];
+    const positions = new Map(savedOrder.map((key,index) => [key,index]));
+    return DATA.films.filter(f => (f.editions || []).some(e => String(e.physicalSetId) === String(id)))
+      .sort((a,b) => (positions.get(filmKey(a)) ?? Infinity) - (positions.get(filmKey(b)) ?? Infinity)
+        || DATA.films.indexOf(a) - DATA.films.indexOf(b));
+  };
+  function renderOverviewMovies() {
+    const set = getSet(overviewSetId);if(!set)return;
+    const movies = moviesForSet(overviewSetId);
+    const movieByKey = new Map(movies.map(f => [filmKey(f),f]));
+    const ordered = isOrdering
+      ? [...orderDraft.map(key => movieByKey.get(key)).filter(Boolean), ...movies.filter(f => !orderDraft.includes(filmKey(f)))]
+      : movies;
     $('rcSetOverviewTitle').textContent = set.name;
-    $('rcSetOverviewIntro').textContent = 'Alle films die je fysiek bezit in deze set (' + movies.length + '). Tik op een poster om die film te openen.';
-    $('rcSetOverviewMovies').innerHTML = movies.length
-      ? movies.map(f => {
+    $('rcSetOverviewIntro').textContent = isOrdering
+      ? 'Sleep de films naar de juiste plek of gebruik de pijltjes. Sla daarna de volgorde op.'
+      : 'Alle films die je fysiek bezit in deze set (' + movies.length + '). Tik op een poster om die film te openen.';
+    $('rcSetOverviewIntro').classList.toggle('rc-set-order-hint',isOrdering);
+    $('rcSetOverviewMovies').innerHTML = ordered.length
+      ? ordered.map((f,position) => {
         const index = DATA.films.indexOf(f);
         const image = posterCache[index] || f.poster_url || '';
-        return '<button type="button" class="rc-set-movie" data-film-index="' + index + '">' +
-          '<span class="rc-set-movie-poster">' +
+        const posterHtml = '<span class="rc-set-movie-poster">' +
           (image ? imageMarkup(image,f.title) : safe(f.title)) + '</span>' +
-          '<strong>' + safe(f.title) + '</strong><small>' + safe(f.year || '') + '</small></button>';
+          '<strong>' + safe(f.title) + '</strong><small>' + safe(f.year || '') + '</small>';
+        return isOrdering
+          ? '<div class="rc-set-movie rc-set-movie-order" draggable="true" data-order-key="' + safe(filmKey(f)) + '">' +
+            posterHtml + '<div class="rc-set-order-actions">' +
+            '<button type="button" data-move="-1" aria-label="' + safe(f.title) + ' omhoog" ' + (position === 0 ? 'disabled' : '') + '>↑</button>' +
+            '<button type="button" data-move="1" aria-label="' + safe(f.title) + ' omlaag" ' + (position === ordered.length-1 ? 'disabled' : '') + '>↓</button>' +
+            '</div></div>'
+          : '<button type="button" class="rc-set-movie" data-film-index="' + index + '">' + posterHtml + '</button>';
       }).join('')
       : '<p>Nog geen films gekoppeld. Kies deze set bij een fysieke uitgave en sla de film op.</p>';
-    $('rcSetOverviewEdit').hidden = !window.__filmAdminSignedIn;
-    $('rcSetOverviewEdit').onclick = () => openEditor(id);
+    const admin = window.__filmAdminSignedIn === true;
+    $('rcSetOverviewEdit').hidden = !admin || isOrdering;
+    $('rcSetOverviewOrder').hidden = !admin || isOrdering || movies.length < 2;
+    $('rcSetOrderCancel').hidden = !isOrdering;
+    $('rcSetOrderSave').hidden = !isOrdering;
+    $('rcSetOverviewClose').hidden = isOrdering;
+    if(!isOrdering){$('rcSetOrderStatus').hidden = true;$('rcSetOrderStatus').textContent = '';}
+  }
+  function openOverview(id) {
+    if(!getSet(id))return;
+    overviewSetId = id;
+    isOrdering = false;
+    orderDraft = [];
+    renderOverviewMovies();
     overview.hidden = false;
   }
-  const closeOverview = () => {overview.hidden = true;};
-  $('rcSetOverviewClose').onclick = closeOverview;
-  overview.addEventListener('click', e => {if(e.target === overview)closeOverview();});
-  $('rcSetOverviewMovies').addEventListener('click', e => {
+  function closeOverview() {
+    if(orderSaving)return;
+    overview.hidden = true;
+    overviewSetId = null;
+    isOrdering = false;
+    orderDraft = [];
+  }
+  $('rcSetOverviewEdit').onclick = () => {
+    if(overviewSetId)openEditor(overviewSetId,null,true);
+  };
+  $('rcSetOverviewOrder').onclick = () => {
+    if(!overviewSetId || window.__filmAdminSignedIn !== true)return;
+    orderDraft = moviesForSet(overviewSetId).map(filmKey);
+    isOrdering = true;
+    renderOverviewMovies();
+  };
+  $('rcSetOrderCancel').onclick = () => {
+    if(orderSaving)return;
+    isOrdering = false;
+    orderDraft = [];
+    renderOverviewMovies();
+  };
+  function moveOrder(fromKey,toKey) {
+    const from = orderDraft.indexOf(fromKey),to = orderDraft.indexOf(toKey);
+    if(from < 0 || to < 0 || from === to)return;
+    orderDraft.splice(from,1);
+    orderDraft.splice(to,0,fromKey);
+    renderOverviewMovies();
+  }
+  const movieGrid = $('rcSetOverviewMovies');
+  movieGrid.addEventListener('click', e => {
+    if(isOrdering){
+      const arrow = e.target.closest('[data-move]');
+      const card = e.target.closest('[data-order-key]');
+      if(!arrow || !card)return;
+      const index = orderDraft.indexOf(card.dataset.orderKey);
+      const other = orderDraft[index + Number(arrow.dataset.move)];
+      if(other)moveOrder(card.dataset.orderKey,other);
+      return;
+    }
     const target = e.target.closest('[data-film-index]');if(!target)return;
     const movie = DATA.films[Number(target.dataset.filmIndex)];if(!movie)return;
     closeOverview();detail(movie);
     if(!$('detail').classList.contains('active'))show('detail');
     else window.scrollTo({top:0,left:0,behavior:'auto'});
   });
+  let draggingKey = null;
+  movieGrid.addEventListener('dragstart',e => {
+    if(!isOrdering)return;
+    const card = e.target.closest('[data-order-key]');if(!card)return;
+    draggingKey = card.dataset.orderKey;
+    if(e.dataTransfer){e.dataTransfer.effectAllowed = 'move';e.dataTransfer.setData('text/plain',draggingKey);}
+    card.classList.add('rc-set-dragging');
+  });
+  movieGrid.addEventListener('dragover',e => {
+    if(!isOrdering || !draggingKey)return;
+    const card = e.target.closest('[data-order-key]');if(!card)return;
+    e.preventDefault();
+    movieGrid.querySelectorAll('.rc-set-drop-target').forEach(el => el.classList.remove('rc-set-drop-target'));
+    card.classList.add('rc-set-drop-target');
+    if(e.dataTransfer)e.dataTransfer.dropEffect = 'move';
+  });
+  movieGrid.addEventListener('drop',e => {
+    if(!isOrdering || !draggingKey)return;
+    const card = e.target.closest('[data-order-key]');
+    e.preventDefault();
+    if(card)moveOrder(draggingKey,card.dataset.orderKey);
+    draggingKey = null;
+    movieGrid.querySelectorAll('.rc-set-drop-target,.rc-set-dragging').forEach(el => el.classList.remove('rc-set-drop-target','rc-set-dragging'));
+  });
+  movieGrid.addEventListener('dragend',() => {
+    draggingKey = null;
+    movieGrid.querySelectorAll('.rc-set-drop-target,.rc-set-dragging').forEach(el => el.classList.remove('rc-set-drop-target','rc-set-dragging'));
+  });
+  $('rcSetOrderSave').onclick = async () => {
+    if(!isOrdering || !overviewSetId || orderSaving)return;
+    const id = overviewSetId;
+    const status = $('rcSetOrderStatus');
+    status.hidden = false;status.textContent = 'Volgorde opslaan…';
+    orderSaving = true;
+    const saveButton = $('rcSetOrderSave');saveButton.disabled = true;
+    try{
+      if(orderDraft.some(key => key.startsWith('index:')))throw Error('Niet alle films hebben een database-ID. Vernieuw de pagina.');
+      const token = await adminAccessToken();
+      const saved = await adminRest('physical_sets','PATCH',{film_order:orderDraft.slice()},token,'?id=eq.' + encodeURIComponent(id));
+      if(!saved?.[0]?.id)throw Error('Supabase heeft de nieuwe volgorde niet bevestigd.');
+      const index = records().findIndex(set => String(set.id) === String(id));
+      if(index >= 0)records().splice(index,1,{...records()[index],...saved[0]});
+      isOrdering = false;orderDraft = [];
+      renderOverviewMovies();
+    }catch(error){
+      status.textContent = 'Opslaan mislukt: ' + error.message + ' Controleer of de nieuwe SQL is uitgevoerd.';
+    }finally{orderSaving = false;saveButton.disabled = false;}
+  };
+  $('rcSetOverviewClose').onclick = closeOverview;
+  overview.addEventListener('click', e => {if(e.target === overview)closeOverview();});
   document.addEventListener('keydown', e => {
     if(e.key === 'Escape'){
       if(!editor.hidden)closeEditor();
-      else if(!overview.hidden)closeOverview();
+      else if(!overview.hidden){
+        if(isOrdering && !orderSaving){isOrdering = false;orderDraft = [];renderOverviewMovies();}
+        else closeOverview();
+      }
     }
   });
 })();
@@ -5781,16 +5933,22 @@ render();
     '.rc-filter-option[aria-selected="true"]::before{content:"✓";color:#e4bf7a}',
     '.rc-filter-query{display:block;width:100%;box-sizing:border-box;margin:2px 0 7px;border:1px solid #587563;background:#071b17;color:#f5eddf;border-radius:7px;padding:9px;font-size:13px}',
     '.rc-filter-empty{color:#aab8ad;font-size:12px;padding:9px}',
-    '.rc-extra-filters-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:9px 0 17px}',
-    '.rc-more-filters-toggle{flex:0 0 auto;min-height:40px;border:1px solid #95764c;border-radius:9px;background:#102d26;color:#e2c293;padding:9px 13px;font:700 13px system-ui,sans-serif;cursor:pointer}',
+    '.rc-extra-filters-bar{display:contents}',
+    '#collection .toolbar .rc-filter-action-stack{display:flex;flex-direction:column;align-items:stretch;gap:6px;order:1;min-width:105px}',
+    '#collection .toolbar .rc-filter-action-stack #clearFilters{order:0;margin:0;height:44px;white-space:nowrap}',
+    '.rc-more-filters-toggle{flex:0 0 auto;min-height:38px;border:1px solid #95764c;border-radius:9px;background:#102d26;color:#e2c293;padding:8px 10px;font:700 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap}',
     '.rc-more-filters-toggle:hover,.rc-more-filters-toggle[aria-expanded="true"]{background:#1b4235}',
     '.rc-more-filters-toggle.has-active{box-shadow:0 0 0 2px #d9b87870}',
     '.rc-extra-filter-fields[hidden]{display:none!important}',
-    '.rc-extra-filter-fields{display:flex;align-items:flex-end;flex:1 1 520px;gap:10px;flex-wrap:wrap}',
+    '.rc-extra-filter-fields{display:flex;align-items:flex-end;flex:1 1 520px;gap:10px;flex-wrap:wrap;order:7}',
     '.rc-extra-filter-unit{min-width:150px;flex:1 1 150px;max-width:240px}',
     '.rc-extra-filter-unit>small{display:block;color:#cfbc99;letter-spacing:.3px;margin-bottom:6px;font-size:11px;font-weight:700}',
     '.rc-extra-filter-unit .rc-filter-wrap{min-width:0;max-width:none;width:100%}',
-    '@media(max-width:680px){.rc-filter-wrap{flex:1 1 135px;max-width:none}.rc-extra-filter-unit{min-width:135px;flex:1 1 135px;max-width:none}.rc-filter-popover{width:max(100%,220px)}.rc-extra-filters-bar{align-items:stretch}}'
+    '#collection .toolbar{margin-bottom:2px!important;padding-bottom:3px!important}',
+    '#collection #count{margin-top:8px!important;margin-bottom:12px!important}',
+    '@media(min-width:900px){#collection .toolbar{display:grid!important;grid-template-columns:minmax(150px,1fr) 110px minmax(100px,130px) minmax(100px,118px) minmax(110px,138px) minmax(110px,145px) minmax(112px,146px);grid-template-rows:44px 38px;column-gap:8px;row-gap:6px;align-items:start;padding-top:10px!important}#collection .toolbar #search{grid-column:1;grid-row:1;width:100%!important;height:44px;min-width:0!important}#collection .toolbar .rc-filter-action-stack{grid-column:2;grid-row:1/3}#collection .toolbar .rc-filter-wrap-genre{grid-column:3;grid-row:1}#collection .toolbar .rc-filter-wrap-format{grid-column:4;grid-row:1}#collection .toolbar .rc-filter-wrap-watched{grid-column:5;grid-row:1}#collection .toolbar .rc-filter-wrap-discFilter{grid-column:6;grid-row:1}#collection .toolbar .rc-filter-wrap-sort{grid-column:7;grid-row:1}#collection .toolbar .rc-filter-wrap{min-width:0;max-width:none;width:100%}#collection .toolbar .rc-extra-filter-fields{grid-column:3/-1;grid-row:2;align-self:start;flex-wrap:nowrap;gap:8px}#collection .toolbar .rc-extra-filter-unit{flex:1 1 0;max-width:none;min-width:0}#collection .toolbar .rc-extra-filter-unit>small{display:none}#collection .toolbar .rc-extra-filter-unit .rc-filter-trigger{height:38px}#collection .toolbar .rc-filter-action-stack #clearFilters{font-size:11px!important}#collection .toolbar .rc-more-filters-toggle{font-size:11px}}',
+    '@media(max-width:899px){#collection .toolbar{display:flex!important;flex-wrap:wrap!important;align-items:flex-start!important}#collection .toolbar .rc-filter-action-stack{flex:0 0 112px}#collection .toolbar .rc-extra-filter-fields{flex:1 1 100%;width:100%}#collection .toolbar .rc-filter-wrap{max-width:none}}',
+    '@media(max-width:680px){.rc-filter-wrap{flex:1 1 135px;max-width:none}.rc-extra-filter-unit{min-width:135px;flex:1 1 135px;max-width:none}.rc-filter-popover{width:max(100%,220px)}#collection .toolbar .rc-filter-action-stack{flex:0 0 116px}}'
   ].join('\n');
   document.head.appendChild(style);
 
@@ -5799,13 +5957,18 @@ render();
   extraBar.className = 'rc-extra-filters-bar';
   extraBar.id = 'rcExtraFiltersBar';
   extraBar.innerHTML =
-    '<button id="rcMoreFiltersToggle" class="rc-more-filters-toggle" type="button" aria-expanded="false" aria-controls="rcExtraFilterFields">＋ Meer filters <span id="rcExtraCount"></span></button>' +
     '<div id="rcExtraFilterFields" class="rc-extra-filter-fields" hidden>' +
     '<div class="rc-extra-filter-unit"><small>Gesproken taal</small><select id="rcFilterLanguage" aria-label="Filter op gesproken taal"><option value="">Alle talen</option></select></div>' +
     '<div class="rc-extra-filter-unit"><small>Ondertiteling</small><select id="rcFilterSubtitles" aria-label="Filter op ondertiteling"><option value="">Alle ondertitels</option></select></div>' +
     '<div class="rc-extra-filter-unit"><small>Label / studio</small><select id="rcFilterLabel" aria-label="Filter op label of studio"><option value="">Alle labels</option></select></div>' +
     '</div>';
-  toolbar.after(extraBar);
+  const actionStack = document.createElement('div');
+  actionStack.className = 'rc-filter-action-stack';
+  $('clearFilters').before(actionStack);
+  actionStack.appendChild($('clearFilters'));
+  actionStack.insertAdjacentHTML('beforeend',
+    '<button id="rcMoreFiltersToggle" class="rc-more-filters-toggle" type="button" aria-expanded="false" aria-controls="rcExtraFilterFields">＋ Meer filters <span id="rcExtraCount"></span></button>');
+  toolbar.appendChild(extraBar);
   const filterIds = ['rcFilterLanguage','rcFilterSubtitles','rcFilterLabel'];
   let isOpen = false;
   try{isOpen = localStorage.getItem('rcMoreFiltersExpandedV1') === 'true';}catch(_){}
@@ -5858,7 +6021,7 @@ render();
   }
   function addPicker(select,order){
     const wrapper = document.createElement('div');
-    wrapper.className = 'rc-filter-wrap';
+    wrapper.className = 'rc-filter-wrap rc-filter-wrap-' + select.id;
     wrapper.style.setProperty('--rc-order',String(order));
     select.before(wrapper);
     wrapper.appendChild(select);
