@@ -2863,6 +2863,17 @@ if(tmdbKey){$('posterStatus').textContent='TMDB verbonden — posters laden tijd
 /* Supabase v30: public read-only sync. Personal viewing log is deliberately NOT bundled. */
 const SUPABASE_URL='https://jfgojgbyorumeefgzvwd.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY='sb_publishable_EB27kcAdGy--KkcL6wl-cw__yJqVSJR';
+// Een enkele historische titel wordt door de gewone TMDB-tekstzoekopdracht
+// niet betrouwbaar gevonden. Gebruik dan het gecontroleerde TMDB-filmnummer.
+// Deze functie wordt door zowel Collectie als Filmwinkel gebruikt.
+function rcFilmLookupPayload(title,year){
+ const normalized=String(title||'').trim().toLowerCase().replace(/&/g,' and ').replace(/[.,]/g,'').replace(/\s+/g,' ');
+ const releaseYear=Number(year)||null;
+ if((normalized==='the adventures of ichabod and mr toad'||normalized==='ichabod and mr toad')&&(!releaseYear||releaseYear===1949)){
+  return {tmdb_id:13465};
+ }
+ return {title,year:releaseYear};
+}
 async function loadPublicTable(table){
  const response=await fetch(SUPABASE_URL+'/rest/v1/'+table+'?select=*&limit=1000',{
   headers:{'apikey':SUPABASE_PUBLISHABLE_KEY,'Authorization':'Bearer '+SUPABASE_PUBLISHABLE_KEY}
@@ -3559,7 +3570,7 @@ function addEdition(existing=null){
   const btn=el('lookupNewFilm');btn.disabled=true;status.textContent='Filmgegevens zoeken…';
   try{
    // Edge Function keeps TMDB credentials private. A 404 means the function still needs deployment.
-   const response=await fetch(SUPABASE_URL+'/functions/v1/film-metadata',{method:'POST',headers:{'apikey':SUPABASE_PUBLISHABLE_KEY,'Authorization':'Bearer '+SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify({title,year:year?Number(year):null})});
+   const response=await fetch(SUPABASE_URL+'/functions/v1/film-metadata',{method:'POST',headers:{'apikey':SUPABASE_PUBLISHABLE_KEY,'Authorization':'Bearer '+SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(rcFilmLookupPayload(title,year))});
    const result=await response.json().catch(()=>({}));if(!response.ok)throw Error(result.error||'HTTP '+response.status);
    lookupInfo={...result,poster_url:result.poster_url||purchasedPoster||null};
    window.__rcLatestLookup={title:result.title||title,year:String(result.year||year||""),tmdb_id:result.tmdb_id||null};
@@ -4441,7 +4452,7 @@ async function lookupTMDB(){
   // Dezelfde beveiligde Supabase Edge Function als 'Film toevoegen' in Collectie.
   const response=await fetch(SUPABASE_URL+'/functions/v1/film-metadata',{
    method:'POST',headers:{'apikey':SUPABASE_PUBLISHABLE_KEY,'Authorization':'Bearer '+SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},
-   body:JSON.stringify({title,year})
+   body:JSON.stringify(rcFilmLookupPayload(title,year))
   });
   const result=await response.json().catch(()=>({}));
   if(!response.ok)throw Error(result.error||'HTTP '+response.status);
