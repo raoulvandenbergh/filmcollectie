@@ -1185,15 +1185,17 @@ button.rc-gaps-movie{cursor:pointer}button.rc-gaps-movie:hover{background:#28453
 @media(max-width:560px){.rc-gaps-stats{gap:7px}.rc-gaps-stat{padding:12px 10px}.rc-gaps-stat strong{font-size:22px}.rc-gaps-stat span{font-size:10px}.rc-gaps-card{padding:13px}.rc-gaps-photo{width:52px;height:66px}.rc-gaps-photo.franchise{width:76px;height:58px}.rc-gaps-name h3{font-size:19px}.rc-gaps-fraction{font-size:14px}.rc-gaps-detail-grid{grid-template-columns:95px minmax(0,1fr);gap:13px}.rc-gaps-detail-trailer{grid-column:1/-1}.rc-gaps-detail-grid h2{font-size:25px}.rc-gaps-person{width:80px}.rc-gaps-person img,.rc-gaps-person>span{height:104px}}
 
 </style><style id="rc-watch-source-styles">
-/* Optionele kijkwijze: eigen disc blijft de standaard. */
-.rc-watch-source{border:1px solid #826e50;border-radius:10px;background:rgba(212,174,107,.07);padding:9px 12px;margin:10px 0 12px}
-.rc-watch-source-toggle{display:flex!important;align-items:center;gap:11px;cursor:pointer;margin:0!important;color:#ead6b2!important;font-size:13px!important;line-height:1.4}
-.rc-watch-source-toggle input[type=checkbox]{appearance:auto!important;display:block!important;flex:none!important;width:18px!important;height:18px!important;min-width:18px!important;padding:0!important;margin:0!important;accent-color:#e3bd7c;cursor:pointer}
-.rc-watch-source-toggle span{display:block;min-width:0}
-.rc-watch-source-toggle strong{font-weight:750}
-.rc-watch-source-toggle small{display:block;color:#aabdb1;font-size:11px;margin-top:2px;font-weight:400}
+/* Optionele kijkwijze: eigen disc blijft de standaard. Klein, ingetogen alternatief. */
+.rc-watch-source{border:0;border-radius:0;background:transparent;padding:0;margin:5px 0 11px}
+.rc-watch-source-toggle{display:inline-flex!important;align-items:center;gap:7px;cursor:pointer;margin:0!important;color:#aabbb1!important;font-size:11px!important;line-height:1.4}
+.rc-watch-source-toggle input[type=checkbox]{appearance:auto!important;display:block!important;flex:none!important;width:13px!important;height:13px!important;min-width:13px!important;padding:0!important;margin:0!important;accent-color:#c7a676;cursor:pointer}
+.rc-watch-source-toggle span{display:inline-block;min-width:0}
+.rc-watch-source-toggle strong{font-weight:550}
+.rc-watch-source-toggle small{display:none}
+.rc-watch-source-toggle:hover{color:#e0d0b7!important}
+.rc-watch-source-toggle:focus-within{outline:1px solid #ad916b;outline-offset:4px;border-radius:2px}
 .rc-watch-source-details[hidden],#watchCutWrap[hidden],#watchEditionWrap[hidden],#editWatchCutWrap[hidden],#editWatchEditionWrap[hidden]{display:none!important}
-.rc-watch-source-details{margin-top:12px;padding-top:10px;border-top:1px dashed #90775280}
+.rc-watch-source-details{margin-top:10px;padding:11px 12px;border:1px solid #635940;border-radius:9px;background:rgba(212,174,107,.045)}
 .rc-watch-source-details label{display:block!important;margin:7px 0 4px!important;font-size:12px!important;color:#e1cfb4!important}
 .rc-watch-source-details select,.rc-watch-source-details input{width:100%;display:block;box-sizing:border-box;padding:9px 11px;border-radius:7px;background:#12251f;color:#f6eee0;border:1px solid #78674e}
 .rc-watch-source-details input::placeholder{color:#a5b3a8}
@@ -1369,7 +1371,36 @@ window.addEventListener('popstate',event=>{
   requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:y,left:0,behavior:'auto'})));
  }finally{navigatingBrowserHistory=false;}
 });
-function summary(){let a=[['Films in bezit',DATA.stats.films],['Films gezien',DATA.stats.seen],['Discs gezien',DATA.films.filter(f=>hasPlayedEdition(f)).length],['Geregistreerde kijkbeurten',DATA.stats.entries]];let h=a.map(([k,v])=>`<div class="stat"><strong>${v}</strong><span>${k}</span></div>`).join('');$('summary').innerHTML=h;$('stats2').innerHTML=h}summary();
+// RC: wissel uitsluitend de teller 'Geregistreerde kijkbeurten' tussen alles en fysieke discs.
+let rcDiscStatsOnly=false;
+function rcPhysicalWatch(entry){
+ if(!entry||entry._historyOnly||rcIsNonDiscWatch(entry))return false;
+ if(entry._editionId!=null&&String(entry._editionId).trim()!=='')return true;
+ // Een onbekende kijkwijze wordt niet automatisch als een disc beschouwd.
+ return /(?:\b4k\b|\buhd\b|blu[ -]?ray|\bdvd\b|\bdisc\b)/i.test(String(entry.format||''));
+}
+function rcStatsMarkup(films,seen,discs,entries){
+ const discEntries=rcDiscStatsOnly?allHistory().filter(rcPhysicalWatch).length:null;
+ const cards=[['Films in bezit',films],['Films gezien',seen],['Discs gezien',discs]];
+ const common=cards.map(([label,count])=>`<div class="stat"><strong>${count}</strong><span>${label}</span></div>`).join('');
+ const caption=rcDiscStatsOnly?'Kijkbeurten via discs':'Geregistreerde kijkbeurten';
+ const toggle=rcDiscStatsOnly?'Alles':'Discs';
+ const title=rcDiscStatsOnly?'Toon alle geregistreerde kijkbeurten':'Toon alleen geregistreerde kijkbeurten via fysieke discs';
+ return common+`<div class="stat rc-stat-views"><button type="button" class="rc-stat-disc-toggle" aria-label="${title}" title="${title}" aria-pressed="${rcDiscStatsOnly}">${toggle}</button><strong>${rcDiscStatsOnly?discEntries:entries}</strong><span>${caption}</span></div>`;
+}
+function rcSetStatsMarkup(films,seen,discs,entries){
+ const html=rcStatsMarkup(films,seen,discs,entries);
+ $('summary').innerHTML=html;
+ $('stats2').innerHTML=html;
+}
+for(const id of ['summary','stats2']){
+ document.getElementById(id)?.addEventListener('click',event=>{
+  if(!event.target.closest('.rc-stat-disc-toggle'))return;
+  rcDiscStatsOnly=!rcDiscStatsOnly;
+  updateCounts();
+ });
+}
+function summary(){rcSetStatsMarkup(DATA.stats.films,DATA.stats.seen,DATA.films.filter(f=>hasPlayedEdition(f)).length,DATA.stats.entries)}summary();
 function fillGenreFilter(){const sel=$('genre'),previous=sel.value;const names=[...new Set(DATA.films.flatMap(f=>String(f.genres||'').split(/\s*[|,;]\s*/).map(x=>x.trim()).filter(Boolean)))].sort((a,b)=>a.localeCompare(b,'nl'));sel.innerHTML='<option value="">Alle genres</option>'+names.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join('');if(names.includes(previous))sel.value=previous;}fillGenreFilter();
 function collectionSortTitle(title){return String(title||'').trim().replace(/^(?:the|an|a)\s+/i,'').toLocaleLowerCase('nl-NL');}
 function discGroupKey(f,e){return cutName(e.title,f.title).trim().toLocaleLowerCase('nl-NL');}
@@ -1670,7 +1701,7 @@ function updateDiary(){
  if(typeof watchPosters==='function'&&tmdbKey)watchPosters();
 }
 
-function updateCounts(){const uniqueSeen=DATA.films.filter(f=>f.seen||filmHistory(f).some(h=>!h._historyOnly)).length;const entries=allHistory().length;const stats=[['Films in bezit',DATA.stats.films],['Films gezien',uniqueSeen],['Discs gezien',DATA.films.filter(f=>hasPlayedEdition(f)).length],['Geregistreerde kijkbeurten',entries]];const html=stats.map(([k,v])=>`<div class="stat"><strong>${v}</strong><span>${k}</span></div>`).join('');$('summary').innerHTML=html;$('stats2').innerHTML=html;}
+function updateCounts(){const uniqueSeen=DATA.films.filter(f=>f.seen||filmHistory(f).some(h=>!h._historyOnly)).length;const entries=allHistory().length;rcSetStatsMarkup(DATA.stats.films,uniqueSeen,DATA.films.filter(f=>hasPlayedEdition(f)).length,entries);}
 const todayLocal=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 // v41 — Alleen ingelogde beheerders kunnen kijkbeurten opslaan.
 function cutName(editionTitle,filmTitle){
@@ -4149,12 +4180,19 @@ function renderMemories(){
  let img=(filmIndex>=0?posterCache[filmIndex]:'')||f?.poster_url||f?.posterUrl||f?.poster||'';
  if(typeof img==='string'&&img.startsWith('/'))img='https://image.tmdb.org/t/p/w185'+img;
  if(typeof img!=='string'||!/^https:\/\//.test(img))img='';
+ // Nooit een huidige beoordeling als een historische kijkbeurt-rating presenteren.
+ const hasRating=value=>value!==null&&value!==undefined&&String(value).trim()!==''&&Number.isFinite(Number(String(value).replace(',','.')));
+ const oldRating=entry.rating;
+ const currentRating=f&&typeof filmRating==='function'?filmRating(f):f?.rating;
+ const isHistorical=hasRating(oldRating);
+ const score=isHistorical?oldRating:currentRating;
+ const ratingText=hasRating(score)?' · ★ '+safe(Number(String(score).replace(',','.')).toLocaleString('nl-NL',{maximumFractionDigits:1}))+(isHistorical?'':' <span class="film58-memory-rating-now" title="Geen beoordeling opgeslagen voor deze kijkbeurt; dit is de huidige filmrating">(nu)</span>'):'';
  host.hidden=false;
  host.classList.toggle('film58-collapsed',memoryCollapsed);
  host.innerHTML=`<button type="button" class="film58-memory-toggle" aria-label="${memoryCollapsed?'Toon':'Verberg'} Op deze dag" title="${memoryCollapsed?'Toon':'Verberg'} Op deze dag">${memoryCollapsed?'＋':'−'}</button><span class="film58-memory-collapsed-label">✦ Op deze dag · Tonen</span><div class="film58-memory-content">`+(img?`<button class="film58-memory-poster-button" type="button" aria-label="Open filmpagina van ${safe(title)}"><img class="film58-memory-poster" alt="Poster van ${safe(title)}" src="${safe(img)}"></button>`:'')+
  `<div class="film58-memory-copy"><small>✦ Op deze dag · ${safe(entry.date.slice(8,10))}-${safe(entry.date.slice(5,7))}</small>
  <button class="film58-memory-open" type="button"><strong>${safe(title)}</strong></button>
- <p>${years===1?'1 jaar geleden':years+' jaar geleden'} bekeken${entry.rating!==undefined&&entry.rating!==null&&entry.rating!==''?' · ★ '+safe(entry.rating):''}</p></div>`+
+ <p>${years===1?'1 jaar geleden':years+' jaar geleden'} bekeken${ratingText}</p></div>`+
  (list.length>1?`<div class="film58-memory-nav"><button type="button" data-dir="-1" aria-label="Vorige herinnering">‹</button><button type="button" data-dir="1" aria-label="Volgende herinnering">›</button></div>`:'')+'</div>';
  host.querySelector('.film58-memory-toggle').onclick=()=>{
    memoryCollapsed=!memoryCollapsed;
@@ -4267,6 +4305,15 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh()}
 window.addEventListener('focus',refresh);
 })();
 </script>
+<style id="rc-views-toggle-and-memory-rating">
+#summary .stat.rc-stat-views,#stats2 .stat.rc-stat-views{position:relative}
+.rc-stat-disc-toggle{position:absolute;top:9px;right:10px;z-index:2;padding:3px 7px;min-width:0;border:1px solid rgba(194,169,123,.35);border-radius:6px;background:rgba(14,36,31,.58);color:#bba987;font:600 10px/1.3 Inter,system-ui,sans-serif;letter-spacing:.1px;cursor:pointer;white-space:nowrap}
+.rc-stat-disc-toggle:hover,.rc-stat-disc-toggle:focus-visible{border-color:#d3ae78;color:#f3d9ac;background:#223c32}
+.rc-stat-disc-toggle[aria-pressed="true"]{border-color:#a68a60;color:#ebd1a5}
+#summary .stat.rc-stat-views{padding-top:26px}
+#stats2 .stat.rc-stat-views{padding-top:31px}
+.film58-memory-rating-now{color:#8fa99c;font-size:10px;font-weight:400;white-space:nowrap}
+</style>
 <style id="film591Styles">
 /* Filmkluis: lade beweegt naar voren, deksel klapt open, inhoud komt omhoog. */
 .vault-drawer{transform-origin:center bottom;position:relative;z-index:1;perspective:800px;transition:transform .55s cubic-bezier(.2,.75,.2,1),box-shadow .55s,border-color .25s!important}
