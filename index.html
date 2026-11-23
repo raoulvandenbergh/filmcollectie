@@ -4186,7 +4186,7 @@ function renderMemories(){
  const currentRating=f&&typeof filmRating==='function'?filmRating(f):f?.rating;
  const isHistorical=hasRating(oldRating);
  const score=isHistorical?oldRating:currentRating;
- const ratingText=hasRating(score)?' · ★ '+safe(Number(String(score).replace(',','.')).toLocaleString('nl-NL',{maximumFractionDigits:1}))+(isHistorical?'':' <span class="film58-memory-rating-now" title="Geen beoordeling opgeslagen voor deze kijkbeurt; dit is de huidige filmrating">(nu)</span>'):'';
+ const ratingText=hasRating(score)?' · '+(isHistorical?'★ '+safe(Number(String(score).replace(',','.')).toLocaleString('nl-NL',{maximumFractionDigits:1})):'<span title="Dit is de huidige filmbeoordeling; bij deze kijkbeurt is geen afzonderlijk cijfer opgeslagen">★ '+safe(Number(String(score).replace(',','.')).toLocaleString('nl-NL',{maximumFractionDigits:1}))+'</span>'):'';
  host.hidden=false;
  host.classList.toggle('film58-collapsed',memoryCollapsed);
  host.innerHTML=`<button type="button" class="film58-memory-toggle" aria-label="${memoryCollapsed?'Toon':'Verberg'} Op deze dag" title="${memoryCollapsed?'Toon':'Verberg'} Op deze dag">${memoryCollapsed?'＋':'−'}</button><span class="film58-memory-collapsed-label">✦ Op deze dag · Tonen</span><div class="film58-memory-content">`+(img?`<button class="film58-memory-poster-button" type="button" aria-label="Open filmpagina van ${safe(title)}"><img class="film58-memory-poster" alt="Poster van ${safe(title)}" src="${safe(img)}"></button>`:'')+
