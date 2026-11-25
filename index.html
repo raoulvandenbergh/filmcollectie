@@ -1476,15 +1476,19 @@ if(rcCrewFilter?.loading||rcCrewFilter?.error){
  return;
 }
 let f=DATA.films.filter(f=>rcCrewMatchesFilm(f)&&rcTechnicalMatches(f)&&(!window.rcExtraFilterMatches||window.rcExtraFilterMatches(f))&&(!selectedCountry||filmCountryCodes(f).includes(selectedCountry))&&(f.title+' '+f.director+' '+f.cast).toLocaleLowerCase().includes(q)&&(!g||String(f.genres||'').split(/\s*[|,;]\s*/).includes(g))&&(!fmt||f.editions.some(e=>String(e.format).includes(fmt)))&&(!w||(w==='seen'?(f.seen||filmHistory(f).some(h=>!h._historyOnly)):!(f.seen||filmHistory(f).some(h=>!h._historyOnly))))&&(!d||(d==='seen'?hasPlayedEdition(f):d==='unseen'?!hasPlayedEdition(f):discGroups(f).some(x=>!x.seen))));
+const ratingCache=new Map();const cachedRating=x=>{if(!ratingCache.has(x))ratingCache.set(x,filmRating(x));return ratingCache.get(x)};
 const sort=$('sort').value;f.sort((a,b)=>{let v=0;if(sort==='runtime_desc'||sort==='runtime_asc'){
  const asc=sort==='runtime_asc';
  const av=collectionRuntimeForSort(a,asc),bv=collectionRuntimeForSort(b,asc);
  if(av===null&&bv!==null)return 1;
  if(bv===null&&av!==null)return -1;
  if(av!==null&&bv!==null)v=asc?av-bv:bv-av;
-}else if(sort==='year'||sort==='year_asc')v=sort==='year'?num(b.year)-num(a.year):num(a.year)-num(b.year);else if(sort==='rating'||sort==='rating_asc')v=ratingSort({value:filmRating(a)},{value:filmRating(b)},'value',sort==='rating_asc');else if(sort==='imdb'||sort==='imdb_asc')v=ratingSort(a,b,'imdb',sort==='imdb_asc');else if(sort==='letterboxd'||sort==='letterboxd_asc')v=ratingSort(a,b,'letterboxd',sort==='letterboxd_asc');else if(sort==='title_desc')v=collectionSortTitle(b.title).localeCompare(collectionSortTitle(a.title),'nl',{numeric:true});return v||collectionSortTitle(a.title).localeCompare(collectionSortTitle(b.title),'nl',{numeric:true})||a.title.localeCompare(b.title,'nl')});
-$('count').innerHTML='<strong>'+f.length+'</strong> '+(f.length===1?'film gevonden':'films gevonden');$('movies').innerHTML=f.map(x=>`<article class="movie" data-id="${DATA.films.indexOf(x)}">${poster(x)}<h3>${esc(displayFilmTitle(x.title))}</h3><p>${esc(x.year)} · ${esc(x.director)} ${filmRating(x)?'· ★ '+esc(filmRating(x)) :''}</p></article>`).join('');document.querySelectorAll('.movie').forEach(e=>e.onclick=()=>detail(DATA.films[Number(e.dataset.id)]));watchPosters();}
-['search','genre','format','watched','discFilter','sort'].forEach(id=>$(id).addEventListener('input',render));
+}else if(sort==='year'||sort==='year_asc')v=sort==='year'?num(b.year)-num(a.year):num(a.year)-num(b.year);else if(sort==='rating'||sort==='rating_asc')v=ratingSort({value:cachedRating(a)},{value:cachedRating(b)},'value',sort==='rating_asc');else if(sort==='imdb'||sort==='imdb_asc')v=ratingSort(a,b,'imdb',sort==='imdb_asc');else if(sort==='letterboxd'||sort==='letterboxd_asc')v=ratingSort(a,b,'letterboxd',sort==='letterboxd_asc');else if(sort==='title_desc')v=collectionSortTitle(b.title).localeCompare(collectionSortTitle(a.title),'nl',{numeric:true});return v||collectionSortTitle(a.title).localeCompare(collectionSortTitle(b.title),'nl',{numeric:true})||a.title.localeCompare(b.title,'nl')});
+$('count').innerHTML='<strong>'+f.length+'</strong> '+(f.length===1?'film gevonden':'films gevonden');$('movies').innerHTML=f.map(x=>`<article class="movie" data-id="${DATA.films.indexOf(x)}">${poster(x)}<h3>${esc(displayFilmTitle(x.title))}</h3><p>${esc(x.year)} · ${esc(x.director)} ${cachedRating(x)?'· ★ '+esc(cachedRating(x)) :''}</p></article>`).join('');document.querySelectorAll('.movie').forEach(e=>e.onclick=()=>detail(DATA.films[Number(e.dataset.id)]));watchPosters();}
+// RC performance: combine rapid keystrokes; other filters remain immediate.
+let rcSearchTimer;
+$('search').addEventListener('input',()=>{clearTimeout(rcSearchTimer);rcSearchTimer=setTimeout(()=>render(),140)});
+['genre','format','watched','discFilter','sort'].forEach(id=>$(id).addEventListener('input',()=>{clearTimeout(rcSearchTimer);render()}));
 const WATCH_KEY='filmArchiveExtraWatchesV8';
 let extraWatches=[];
 try{const stored=JSON.parse(localStorage.getItem(WATCH_KEY)||'[]');if(Array.isArray(stored))extraWatches=stored.filter(x=>x&&typeof x.title==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(x.date))}catch(e){}
@@ -2945,7 +2949,7 @@ let decades={};DATA.films.forEach(f=>{let y=num(f.year);if(y>1900){let d=Math.fl
 
 // Load poster images only when in view; max 3 simultaneous TMDB searches.
 const posterObserver=new IntersectionObserver(entries=>{for(const e of entries){if(e.isIntersecting){const id=Number(e.target.dataset.posterId);posterObserver.unobserve(e.target);if(!posterCache[id])queuePoster(id)}}},{rootMargin:'500px'});
-function watchPosters(){document.querySelectorAll('[data-poster-id]').forEach(el=>{let id=Number(el.dataset.posterId);if(posterCache[id]){applyPoster(id,posterCache[id]);return}posterObserver.observe(el)})}
+function watchPosters(){posterObserver.disconnect();document.querySelectorAll('[data-poster-id]').forEach(el=>{let id=Number(el.dataset.posterId);if(posterCache[id]){if(!el.querySelector('img'))applyPoster(id,posterCache[id]);return}posterObserver.observe(el)})}
 function applyPoster(id,url){document.querySelectorAll(`[data-poster-id="${id}"]`).forEach(el=>{if(!el.querySelector('img')){const img=document.createElement('img');img.loading='lazy';img.alt='Poster van '+DATA.films[id].title;img.src=url;img.onerror=()=>img.remove();el.appendChild(img)}})}
 function queuePoster(id){if(posterPending.has(id)||posterDone.has(id))return;posterPending.add(id);posterQueue.push(id);runPosterQueue()}
 async function runPosterQueue(){while(posterBusy<3&&posterQueue.length){const id=posterQueue.shift();posterBusy++;fetchPoster(id).finally(()=>{posterBusy--;runPosterQueue()})}}
@@ -4843,7 +4847,7 @@ items=readLocal();render();fetchRemote();
   };
  }
  function update(){document.querySelectorAll('#newFilmEditions .add-film-row').forEach(enhance);}
- new MutationObserver(update).observe(document.body,{childList:true,subtree:true});update();
+ new MutationObserver(update).observe(document.getElementById('newFilmEditions'),{childList:true,subtree:true});update();
 })();
 </script><style id="rc-spec-import-style">
 .rc-spec-import{grid-column:1/-1;margin-top:12px;border-top:1px solid #53665b;padding-top:12px}
@@ -4927,7 +4931,7 @@ items=readLocal();render();fetchRemote();
   };
  }
  function update(){document.querySelectorAll('#newFilmEditions .add-film-row').forEach(enhance)}
- new MutationObserver(update).observe(document.body,{childList:true,subtree:true});update();
+ new MutationObserver(update).observe(document.getElementById('newFilmEditions'),{childList:true,subtree:true});update();
 })();
 </script><style id="rc-edit-enhancements-style">
 .rc-director-cards{display:flex;flex-wrap:wrap;gap:12px}.rc-director-cards .director-card{flex:0 1 32%;width:auto!important;min-width:220px!important;margin-top:0!important}
@@ -4985,7 +4989,7 @@ items=readLocal();render();fetchRemote();
   document.querySelectorAll('#newFilmEditions .edition-type').forEach(input=>{input.setAttribute('list','rcExistingEditionTypes');input.setAttribute('autocomplete','off')});
  }
  const observer=new MutationObserver(()=>{if(document.getElementById('addFilmDialog')&&!document.getElementById('rcLetterboxdEditLink'))enhance();else document.querySelectorAll('#newFilmEditions .edition-type:not([list])').forEach(x=>x.setAttribute('list','rcExistingEditionTypes'))});
- observer.observe(document.body,{childList:true,subtree:true});
+ observer.observe(document.getElementById('addFilmDialog'),{childList:true,subtree:true});
  enhance();
 })();
 </script>
@@ -5227,7 +5231,7 @@ async function rcLoadFilmTrivia(f){
  }
  function refresh(){document.querySelectorAll('#newFilmEditions .add-film-row').forEach(enhance)}
  const observer=new MutationObserver(refresh);
- observer.observe(document.body,{childList:true,subtree:true});
+ observer.observe(document.getElementById('newFilmEditions'),{childList:true,subtree:true});
  refresh();
 })();
 </script><script id="rc-gaps-script">
@@ -6178,9 +6182,11 @@ render();
   function updateExpanded(){
     $('rcExtraFilterFields').hidden = !isOpen;
     $('rcMoreFiltersToggle').setAttribute('aria-expanded',String(isOpen));
-    $('rcMoreFiltersToggle').querySelector('.rc-more-filters-title').textContent = isOpen ? '− Minder filters' : '＋ Meer filters';
+    const title=$('rcMoreFiltersToggle').querySelector('.rc-more-filters-title'), titleText=isOpen ? '− Minder filters' : '＋ Meer filters';
+    if(title.textContent!==titleText)title.textContent=titleText;
     const active = filterIds.filter(id => $(id).value).length;
-    $('rcExtraCount').textContent = active ? '(' + active + ' actief)' : '';
+    const countText=active ? '(' + active + ' actief)' : '';
+    if($('rcExtraCount').textContent!==countText)$('rcExtraCount').textContent=countText;
     $('rcMoreFiltersToggle').setAttribute('aria-label',(isOpen?'Minder filters':'Meer filters')+(active ? ', '+active+' actief' : ''));
     $('rcMoreFiltersToggle').classList.toggle('has-active',active > 0);
   }
@@ -6251,7 +6257,8 @@ render();
     function sync(){
       const options = [...select.options];
       const chosen = options.find(o => o.value === select.value) || options[0];
-      current.textContent = chosen?.textContent || 'Kies filter';
+      const currentText = chosen?.textContent || 'Kies filter';
+      if(current.textContent !== currentText)current.textContent = currentText;
       button.classList.toggle('is-selected',Boolean(select.value && !(select.id === 'sort' && select.value === 'title')));
       if(picker.optionsHash === options.map(o => o.value + '|' + o.textContent).join('\u001f') && picker.lastValue === select.value)return;
       picker.optionsHash = options.map(o => o.value + '|' + o.textContent).join('\u001f');
