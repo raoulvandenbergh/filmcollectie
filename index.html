@@ -1472,19 +1472,27 @@ function render(){const q=$('search').value.toLocaleLowerCase(),g=$('genre').val
 rcTechnicalBanner();
 if(rcCrewFilter?.loading||rcCrewFilter?.error){
  $('count').textContent=rcCrewFilter.error?'Ophalen van filmcredits mislukt':'Films van '+rcCrewFilter.name+' ophalen…';
- $('movies').innerHTML='<div class="empty">'+(rcCrewFilter.error?'De films van deze persoon konden niet worden opgehaald. Probeer het later opnieuw.':'Even geduld, de films worden opgezocht bij TMDB…')+'</div>';
+ $('movies').__rcMarkup=null; $('movies').innerHTML='<div class="empty">'+(rcCrewFilter.error?'De films van deze persoon konden niet worden opgehaald. Probeer het later opnieuw.':'Even geduld, de films worden opgezocht bij TMDB…')+'</div>';
  return;
 }
 let f=DATA.films.filter(f=>rcCrewMatchesFilm(f)&&rcTechnicalMatches(f)&&(!window.rcExtraFilterMatches||window.rcExtraFilterMatches(f))&&(!selectedCountry||filmCountryCodes(f).includes(selectedCountry))&&(f.title+' '+f.director+' '+f.cast).toLocaleLowerCase().includes(q)&&(!g||String(f.genres||'').split(/\s*[|,;]\s*/).includes(g))&&(!fmt||f.editions.some(e=>String(e.format).includes(fmt)))&&(!w||(w==='seen'?(f.seen||filmHistory(f).some(h=>!h._historyOnly)):!(f.seen||filmHistory(f).some(h=>!h._historyOnly))))&&(!d||(d==='seen'?hasPlayedEdition(f):d==='unseen'?!hasPlayedEdition(f):discGroups(f).some(x=>!x.seen))));
-const ratingCache=new Map();const cachedRating=x=>{if(!ratingCache.has(x))ratingCache.set(x,filmRating(x));return ratingCache.get(x)};
-const sort=$('sort').value;f.sort((a,b)=>{let v=0;if(sort==='runtime_desc'||sort==='runtime_asc'){
+const latestByFilm=new Map();
+for(const h of DATA.history){
+ if(h._historyOnly||h.rating==null||String(h.rating).trim()===''||!Number.isFinite(Number(String(h.rating).replace(',','.'))))continue;
+ const id=h._linkedFilmIndex!=null?Number(h._linkedFilmIndex):diaryFilmId(h.title,h._year);
+ if(id<0)continue;
+ const old=latestByFilm.get(id);
+ if(!old||(String(h.date||'').localeCompare(String(old.date||''))||String(h._createdAt||'').localeCompare(String(old._createdAt||''))||Number(h._sourceIndex||0)-Number(old._sourceIndex||0))>0)latestByFilm.set(id,h);
+}
+const ratingCache=new Map();const cachedRating=x=>{if(!ratingCache.has(x)){const id=DATA.films.indexOf(x),h=latestByFilm.get(id);ratingCache.set(x,window.__supabaseFilmIds?.[id]!=null?(h?Number(String(h.rating).replace(',','.')):x.rating):(ratingOverrides[x.title]!==undefined?ratingOverrides[x.title]:x.rating));}return ratingCache.get(x)};
+const titleCollator=new Intl.Collator('nl',{numeric:true});const sort=$('sort').value;f.sort((a,b)=>{let v=0;if(sort==='runtime_desc'||sort==='runtime_asc'){
  const asc=sort==='runtime_asc';
  const av=collectionRuntimeForSort(a,asc),bv=collectionRuntimeForSort(b,asc);
  if(av===null&&bv!==null)return 1;
  if(bv===null&&av!==null)return -1;
  if(av!==null&&bv!==null)v=asc?av-bv:bv-av;
-}else if(sort==='year'||sort==='year_asc')v=sort==='year'?num(b.year)-num(a.year):num(a.year)-num(b.year);else if(sort==='rating'||sort==='rating_asc')v=ratingSort({value:cachedRating(a)},{value:cachedRating(b)},'value',sort==='rating_asc');else if(sort==='imdb'||sort==='imdb_asc')v=ratingSort(a,b,'imdb',sort==='imdb_asc');else if(sort==='letterboxd'||sort==='letterboxd_asc')v=ratingSort(a,b,'letterboxd',sort==='letterboxd_asc');else if(sort==='title_desc')v=collectionSortTitle(b.title).localeCompare(collectionSortTitle(a.title),'nl',{numeric:true});return v||collectionSortTitle(a.title).localeCompare(collectionSortTitle(b.title),'nl',{numeric:true})||a.title.localeCompare(b.title,'nl')});
-$('count').innerHTML='<strong>'+f.length+'</strong> '+(f.length===1?'film gevonden':'films gevonden');$('movies').innerHTML=f.map(x=>`<article class="movie" data-id="${DATA.films.indexOf(x)}">${poster(x)}<h3>${esc(displayFilmTitle(x.title))}</h3><p>${esc(x.year)} · ${esc(x.director)} ${cachedRating(x)?'· ★ '+esc(cachedRating(x)) :''}</p></article>`).join('');document.querySelectorAll('.movie').forEach(e=>e.onclick=()=>detail(DATA.films[Number(e.dataset.id)]));watchPosters();}
+}else if(sort==='year'||sort==='year_asc')v=sort==='year'?num(b.year)-num(a.year):num(a.year)-num(b.year);else if(sort==='rating'||sort==='rating_asc')v=ratingSort({value:cachedRating(a)},{value:cachedRating(b)},'value',sort==='rating_asc');else if(sort==='imdb'||sort==='imdb_asc')v=ratingSort(a,b,'imdb',sort==='imdb_asc');else if(sort==='letterboxd'||sort==='letterboxd_asc')v=ratingSort(a,b,'letterboxd',sort==='letterboxd_asc');else if(sort==='title_desc')v=titleCollator.compare(collectionSortTitle(b.title),collectionSortTitle(a.title));return v||titleCollator.compare(collectionSortTitle(a.title),collectionSortTitle(b.title))||a.title.localeCompare(b.title,'nl')});
+$('count').innerHTML='<strong>'+f.length+'</strong> '+(f.length===1?'film gevonden':'films gevonden');const movieMarkup=f.map(x=>`<article class="movie" data-id="${DATA.films.indexOf(x)}">${poster(x)}<h3>${esc(displayFilmTitle(x.title))}</h3><p>${esc(x.year)} · ${esc(x.director)} ${cachedRating(x)?'· ★ '+esc(cachedRating(x)) :''}</p></article>`).join('');const movieHost=$('movies');if(movieHost.__rcMarkup===movieMarkup&&movieHost.querySelectorAll('.movie').length===f.length)return;movieHost.__rcMarkup=movieMarkup;movieHost.innerHTML=movieMarkup;document.querySelectorAll('#movies .movie').forEach(e=>e.onclick=()=>detail(DATA.films[Number(e.dataset.id)]));watchPosters();}
 // RC performance: combine rapid keystrokes; other filters remain immediate.
 let rcSearchTimer;
 $('search').addEventListener('input',()=>{clearTimeout(rcSearchTimer);rcSearchTimer=setTimeout(()=>render(),140)});
@@ -3146,7 +3154,7 @@ for(const id of ['exportWatches','backupTest','restoreTest','resetTest']){
  const el=document.getElementById(id);if(el)el.hidden=true;
 }
 
-document.getElementById('clearFilters').addEventListener('click',()=>{for(const id of ['search','genre','format','watched','discFilter','sort']){const el=document.getElementById(id);if(el)el.value=id==='sort'?'title':'';}rcCrewFilter=null;rcPersonFilterActive=false;rcTechnicalFilter=null;selectedCountry='';activeLabel='';for(const id of ['personFilterBanner','countryFilterBanner']){const el=document.getElementById(id);if(el)el.hidden=true;}if(typeof render==='function')render();document.getElementById('search').focus();});
+document.getElementById('clearFilters').addEventListener('click',()=>{for(const id of ['search','genre','format','watched','discFilter','sort']){const el=document.getElementById(id);if(el)el.value=id==='sort'?'title':'';}rcCrewFilter=null;rcPersonFilterActive=false;rcTechnicalFilter=null;selectedCountry='';activeLabel='';for(const id of ['personFilterBanner','countryFilterBanner']){const el=document.getElementById(id);if(el)el.hidden=true;}clearTimeout(rcSearchTimer);window.rcExtraFiltersReset?.(false);if(typeof render==='function')render();document.getElementById('search').focus();});
 
 /* v40 — Supabase Auth login. Public browsing stays anonymous. */
 let adminSession=null;
@@ -6209,7 +6217,7 @@ render();
     if(redraw)render();
   }
   window.rcExtraFiltersReset = resetExtraFilters;
-  $('clearFilters').addEventListener('click',() => resetExtraFilters(true));
+
   $('labelCards').addEventListener('click',e => {
     if(e.target.closest('.label-card'))resetExtraFilters(false);
   },true);
