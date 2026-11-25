@@ -1305,7 +1305,7 @@ function show(v){
  if(rcTransitionTimer!==null){clearTimeout(rcTransitionTimer);rcTransitionTimer=null;}
  document.querySelectorAll('.view').forEach(el=>{el.style.transition='';el.style.opacity='';el.style.transform='';});
  if(!old){showImmediate(v);return;} // De gebruiker heeft animaties voor deze app expliciet ingeschakeld.
- old.style.transition='opacity 180ms ease-in';
+ old.style.transition=v==='diary'?'opacity 90ms ease-in':'opacity 180ms ease-in';
  old.style.opacity='1';
  void old.offsetWidth;
  old.style.opacity='0';
@@ -1320,11 +1320,11 @@ function show(v){
   next.style.opacity='0';
   next.style.transform='translateY(8px)';
   void next.offsetWidth;
-  next.style.transition='opacity 390ms ease-out, transform 390ms cubic-bezier(.2,.7,.2,1)';
+  next.style.transition=v==='diary'?'opacity 180ms ease-out, transform 180ms cubic-bezier(.2,.7,.2,1)':'opacity 390ms ease-out, transform 390ms cubic-bezier(.2,.7,.2,1)';
   next.style.opacity='1';
   next.style.transform='translateY(0)';
   setTimeout(()=>{if(token===rcTransitionToken){next.style.transition='';next.style.opacity='';next.style.transform='';}},430);
- },190);
+ },v==='diary'?100:190);
 }
 function showImmediate(v){
  const previous=document.querySelector('.view.active')?.id||lastHistoryView;
@@ -1359,7 +1359,7 @@ function showImmediate(v){
   requestAnimationFrame(()=>requestAnimationFrame(()=>window.scrollTo({top:target,left:0,behavior:'auto'})));
   return;
  }
- if(v==='collection'&&$('personFilterBanner')&&!rcPersonFilterActive)$('personFilterBanner').hidden=true;if(v==='statistics')setTimeout(()=>{scheduleStatisticsMap();renderTopCharts()},0);if(v==='diary'){if(!diaryFilterNavigationPending)diaryFilterFilmId=null;diaryFilterNavigationPending=false;$('diaryBackFilm').hidden=diaryFilterFilmId===null;updateDiary();}if(v!=='diary'){$('diaryBackFilm').hidden=true;} document.querySelectorAll('.view').forEach(e=>e.classList.toggle('active',e.id===v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));window.scrollTo(0,0);if(v==='gaps')window.rcGapsOnShow?.();}document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{rcPersonFilterActive=false;if(rcCrewFilter){rcCrewFilter=null;$('search').value='';render();}if(b.dataset.view==='gaps')window.rcGapsReset?.();show(b.dataset.view)});$('back').onclick=navigateBackFromDetail;
+ if(v==='collection'&&$('personFilterBanner')&&!rcPersonFilterActive)$('personFilterBanner').hidden=true;if(v==='statistics')setTimeout(()=>{scheduleStatisticsMap();renderTopCharts()},0);if(v==='diary'){if(!diaryFilterNavigationPending)diaryFilterFilmId=null;diaryFilterNavigationPending=false;$('diaryBackFilm').hidden=diaryFilterFilmId===null;if(rcDiaryRenderedFilter!==diaryFilterFilmId||rcDiaryRenderedHistory!==DATA.history||rcDiaryRenderedExtra!==extraWatches||rcDiaryRenderedFilms!==DATA.films)updateDiary();}if(v!=='diary'){$('diaryBackFilm').hidden=true;} document.querySelectorAll('.view').forEach(e=>e.classList.toggle('active',e.id===v));document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));window.scrollTo(0,0);if(v==='gaps')window.rcGapsOnShow?.();}document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{rcPersonFilterActive=false;if(rcCrewFilter){rcCrewFilter=null;$('search').value='';render();}if(b.dataset.view==='gaps')window.rcGapsReset?.();show(b.dataset.view)});$('back').onclick=navigateBackFromDetail;
 if('scrollRestoration' in history)history.scrollRestoration='manual';
 history.replaceState({rcFilmNavigation:true,view:'collection',filmId:null,scrollY:0},'');
 window.addEventListener('popstate',event=>{
@@ -1662,8 +1662,10 @@ function renderPre2021Diary(){
  }).join('')}</tbody></table></div>`;
  host.querySelectorAll('.diary-film-link').forEach(el=>el.addEventListener('click',()=>detail(DATA.films[Number(el.dataset.filmId)])));
 }
+let rcDiaryRenderedFilter,rcDiaryRenderedHistory,rcDiaryRenderedExtra,rcDiaryRenderedFilms;
 function updateDiary(){
- const chronological=allHistory().map((entry,index)=>({entry,index})).sort((a,b)=>String(a.entry.date||'').localeCompare(String(b.entry.date||''))||a.index-b.index);
+ const historyRows=allHistory();
+ const chronological=historyRows.map((entry,index)=>({entry,index})).sort((a,b)=>String(a.entry.date||'').localeCompare(String(b.entry.date||''))||a.index-b.index);
  // De totalen in de oorspronkelijke Excel-collectie omvatten ook oudere kijkbeurten
  // zonder geregistreerde datum. Nummer de gedateerde kijkbeurten daarom vanaf
  // (totaal ooit gezien - aantal geregistreerde kijkbeurten).
@@ -1698,7 +1700,7 @@ function updateDiary(){
   if(Number.isFinite(ia)&&Number.isFinite(ib)&&ia!==ib)return ib-ia;
   return b._sourceIndex-a._sourceIndex;
  };
- const rows=allHistory().map((entry,index)=>({...entry,_viewOrdinal:ordinalByIndex.get(index),_sourceIndex:index})).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||watchTieOrder(a,b));
+ const rows=historyRows.map((entry,index)=>({...entry,_viewOrdinal:ordinalByIndex.get(index),_sourceIndex:index})).sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))||watchTieOrder(a,b));
  const visibleRows=diaryFilterFilmId===null?rows:rows.filter(x=>(x._linkedFilmIndex??diaryFilmId(x.title,x._year))===diaryFilterFilmId || (DATA.films[diaryFilterFilmId] && normTitle(x.title)===normTitle(DATA.films[diaryFilterFilmId].title) && (!x._year || !DATA.films[diaryFilterFilmId].year || Number(x._year)===Number(DATA.films[diaryFilterFilmId].year))));
  const banner=$('diaryFilterBanner');
  $('diaryBackFilm').hidden=(diaryFilterFilmId===null);
@@ -1726,6 +1728,7 @@ function updateDiary(){
  diag.hidden=!unlinked.length;
  diag.innerHTML=unlinked.length?`<summary>⚠ ${unlinked.length} kijkbeurt(en) nog niet gekoppeld — controleer de filmtitels</summary><p class="muted">Alleen zekere overeenkomsten worden automatisch gekoppeld. Deze regels zijn niet aan een willekeurige film toegewezen.</p><ul>${[...new Set(unlinked.map(x=>x.title))].sort().map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:'';
  if(typeof watchPosters==='function'&&tmdbKey)watchPosters();
+ rcDiaryRenderedFilter=diaryFilterFilmId;rcDiaryRenderedHistory=DATA.history;rcDiaryRenderedExtra=extraWatches;rcDiaryRenderedFilms=DATA.films;
 }
 
 
@@ -1753,7 +1756,7 @@ async function rcArchiveOpen(index){
  draw({});show('archiveFilm');const m=await rcArchiveMetadata(h);if(request===rcArchiveRequest)draw(m);
 }
 
-function updateCounts(){const uniqueSeen=DATA.films.filter(f=>f.seen||filmHistory(f).some(h=>!h._historyOnly)).length;const entries=rcCollectionHistory().length;rcSetStatsMarkup(DATA.stats.films,uniqueSeen,DATA.films.filter(f=>hasPlayedEdition(f)).length,entries);}
+function updateCounts(){const uniqueSeen=DATA.films.filter(f=>f.seen||filmHistory(f).some(h=>!h._historyOnly)).length;const entries=allHistory().length;rcSetStatsMarkup(DATA.stats.films,uniqueSeen,DATA.films.filter(f=>hasPlayedEdition(f)).length,entries);}
 const todayLocal=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 // v41 — Alleen ingelogde beheerders kunnen kijkbeurten opslaan.
 function cutName(editionTitle,filmTitle){
