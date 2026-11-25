@@ -1317,7 +1317,7 @@ function showImmediate(v){
  
  if(!navigatingBrowserHistory&&previous!==v){
   saveCurrentHistoryPosition();
-  history.pushState({rcFilmNavigation:true,view:v,filmId:v==='detail'?activeDetailId:null,returnView:v==='detail'?previous:null,scrollY:0},'');
+  history.pushState({rcFilmNavigation:true,view:v,archiveIndex:v==='archiveFilm'?rcArchiveCurrent:null,filmId:v==='detail'?activeDetailId:null,returnView:v==='detail'?previous:null,scrollY:0},'');
  }
  lastHistoryView=v;
  const current=document.querySelector('.view.active')?.id;
@@ -1353,7 +1353,7 @@ window.addEventListener('popstate',event=>{
  if(!state?.rcFilmNavigation)return;
  navigatingBrowserHistory=true;
  try{
-  if(state.view==='detail'&&Number.isInteger(state.filmId)&&DATA.films[state.filmId]){
+  if(state.view==='archiveFilm'&&Number.isInteger(state.archiveIndex)){rcArchiveOpen(state.archiveIndex);}else if(state.view==='detail'&&Number.isInteger(state.filmId)&&DATA.films[state.filmId]){
    detailReturnView=state.returnView==='diary'?'diary':'collection';
    detail(DATA.films[state.filmId]);
   }else if(state.view){
@@ -1380,7 +1380,7 @@ function rcPhysicalWatch(entry){
  return /(?:\b4k\b|\buhd\b|blu[ -]?ray|\bdvd\b|\bdisc\b)/i.test(String(entry.format||''));
 }
 function rcStatsMarkup(films,seen,discs,entries){
- const discEntries=rcDiscStatsOnly?allHistory().filter(rcPhysicalWatch).length:null;
+ const discEntries=rcDiscStatsOnly?rcCollectionHistory().filter(rcPhysicalWatch).length:null;
  const cards=[['Films in bezit',films],['Films gezien',seen],['Discs gezien',discs]];
  const common=cards.map(([label,count])=>`<div class="stat"><strong>${count}</strong><span>${label}</span></div>`).join('');
  const caption=rcDiscStatsOnly?'Kijkbeurten via discs':'Geregistreerde kijkbeurten';
@@ -1686,13 +1686,14 @@ function updateDiary(){
   const calendar=isNew?`<div class="diary-month"><strong>${esc(monthText)}</strong><span>${esc(match?match[1]:'')}</span></div>`:'';
   const film=x._linkedFilmIndex!=null?DATA.films[x._linkedFilmIndex]:(diaryFilmId(x.title,x._year)>=0?DATA.films[diaryFilmId(x.title,x._year)]:null);
   const year=(film?.year||x._year)?`<span class="diary-film-year">(${esc(film?.year||x._year)})</span>`:'';
-  return `<tr class="${isNew?'month-start':''}"><td class="diary-month-cell">${calendar}</td><td class="diary-day">${esc(match?String(Number(match[3])):date)}</td><td class="diary-poster-cell">${diaryPoster(x.title,x._linkedFilmIndex)}</td><td class="diary-film">${film?`<button class="diary-film-link" data-film-id="${DATA.films.indexOf(film)}" title="Open filmpagina">${esc(displayFilmTitle(x.title))}${year}</button>`:`${esc(displayFilmTitle(x.title))}${year}`}</td><td class="diary-rating">${esc(String(x.rating??"").trim()!=="" ? String(x.rating) : (film ? (String(filmRating(film)??"").trim() || "—") : "—"))}</td><td class="diary-view-count">${esc(diaryViewingLabel(x._viewOrdinal))}</td><td class="diary-format">${esc(displayDiscFormat(x.format||''))}</td><td class="diary-edition">${diaryEditionDescription(x,film)}<button type="button" class="ticket-open" data-ticket-index="${x._sourceIndex}" title="Bekijk bioscoopkaartje" aria-label="Bekijk bioscoopkaartje">▤ Ticket</button>${window.__filmAdminSignedIn===true&&x._dbId!=null?`<button type="button" class="diary-edit-button" data-watch-edit="${esc(String(x._dbId))}" title="Bewerk kijkbeurt" aria-label="Bewerk kijkbeurt">✎</button>`:''}</td></tr>`;
+  return `<tr class="${isNew?'month-start':''}"><td class="diary-month-cell">${calendar}</td><td class="diary-day">${esc(match?String(Number(match[3])):date)}</td><td class="diary-poster-cell">${film?diaryPoster(x.title,x._linkedFilmIndex):`<div class="diary-poster diary-poster-empty" data-archive-poster="${x._sourceIndex}">🎞</div>`}</td><td class="diary-film">${film?`<button class="diary-film-link" data-film-id="${DATA.films.indexOf(film)}" title="Open filmpagina">${esc(displayFilmTitle(x.title))}${year}</button>`:`<button class="diary-film-link" data-archive-watch="${x._sourceIndex}">${esc(displayFilmTitle(x.title))}${year}</button>`}</td><td class="diary-rating">${esc(String(x.rating??"").trim()!=="" ? String(x.rating) : (film ? (String(filmRating(film)??"").trim() || "—") : "—"))}</td><td class="diary-view-count">${esc(diaryViewingLabel(x._viewOrdinal))}</td><td class="diary-format">${esc(displayDiscFormat(x.format||''))}</td><td class="diary-edition">${diaryEditionDescription(x,film)}<button type="button" class="ticket-open" data-ticket-index="${x._sourceIndex}" title="Bekijk bioscoopkaartje" aria-label="Bekijk bioscoopkaartje">▤ Ticket</button>${window.__filmAdminSignedIn===true&&x._dbId!=null?`<button type="button" class="diary-edit-button" data-watch-edit="${esc(String(x._dbId))}" title="Bewerk kijkbeurt" aria-label="Bewerk kijkbeurt">✎</button>`:''}</td></tr>`;
  }).join('');
 
  document.querySelectorAll('[data-ticket-index]').forEach(el=>el.addEventListener('click',()=>openCinemaTicket(Number(el.dataset.ticketIndex))));
  document.querySelectorAll('[data-watch-edit]').forEach(el=>el.addEventListener('click',()=>openEditWatch(el.dataset.watchEdit)));
  document.querySelectorAll('.diary-film-link').forEach(el=>el.addEventListener('click',()=>detail(DATA.films[Number(el.dataset.filmId)])));
  renderPre2021Diary();
+ rcArchiveBind();
  const unlinked=visibleRows.filter(x=>(x._linkedFilmIndex??diaryFilmId(x.title,x._year))<0);
  let diag=$('diaryUnlinkedCheck');
  if(!diag){diag=document.createElement('details');diag.id='diaryUnlinkedCheck';diag.className='panel';$('diaryPre2021').after(diag);}
@@ -1701,7 +1702,32 @@ function updateDiary(){
  if(typeof watchPosters==='function'&&tmdbKey)watchPosters();
 }
 
-function updateCounts(){const uniqueSeen=DATA.films.filter(f=>f.seen||filmHistory(f).some(h=>!h._historyOnly)).length;const entries=allHistory().length;rcSetStatsMarkup(DATA.stats.films,uniqueSeen,DATA.films.filter(f=>hasPlayedEdition(f)).length,entries);}
+
+function rcCollectionHistory(){return allHistory().filter(h=>!h._historyOnly && (h._linkedFilmIndex??diaryFilmId(h.title,h._year))>=0);}
+const rcArchiveCache=new Map();
+function rcArchiveKey(h){return JSON.stringify([h.title,h._year||'']);}
+function rcArchiveMetadata(h){
+ const key=rcArchiveKey(h);if(rcArchiveCache.has(key))return rcArchiveCache.get(key);
+ const job=fetch(SUPABASE_URL+'/functions/v1/film-metadata',{method:'POST',headers:{apikey:SUPABASE_PUBLISHABLE_KEY,Authorization:'Bearer '+SUPABASE_PUBLISHABLE_KEY,'Content-Type':'application/json'},body:JSON.stringify(rcFilmLookupPayload(h.title,h._year))}).then(async r=>{if(!r.ok)throw Error('Metadata niet beschikbaar');const m=await r.json();if(!m.title|| (h._year&&m.year&&Math.abs(Number(h._year)-Number(m.year))>1))throw Error('Geen passende film gevonden');return m;}).catch(()=>{rcArchiveCache.delete(key);return {};});rcArchiveCache.set(key,job);return job;
+}
+function rcArchivePoster(m){return /^https:\/\/image\.tmdb\.org\/t\/p\/[^\s]+$/.test(m.poster_url||'')?m.poster_url:/^\/[\w/-]+\.(jpg|png|jpeg|webp)$/i.test(m.poster_path||'')?'https://image.tmdb.org/t/p/w500'+m.poster_path:'';}
+let rcArchiveObserver;
+function rcArchiveBind(){
+ if(rcArchiveObserver)rcArchiveObserver.disconnect();
+ rcArchiveObserver=new IntersectionObserver(entries=>{for(const e of entries){if(!e.isIntersecting)continue;rcArchiveObserver.unobserve(e.target);const h=allHistory()[Number(e.target.dataset.archivePoster)];if(h)rcArchiveMetadata(h).then(m=>{const url=rcArchivePoster(m);if(url&&e.target.isConnected){const img=document.createElement('img');img.src=url;img.alt=h.title;e.target.replaceChildren(img);}});}}, {rootMargin:'200px'});
+ document.querySelectorAll('[data-archive-poster]').forEach(e=>rcArchiveObserver.observe(e));
+ document.querySelectorAll('[data-archive-watch]').forEach(e=>e.onclick=()=>rcArchiveOpen(Number(e.dataset.archiveWatch)));
+}
+let rcArchiveRequest=0,rcArchiveCurrent=null;
+async function rcArchiveOpen(index){
+ const h=allHistory()[index];if(!h)return;rcArchiveCurrent=index;const request=++rcArchiveRequest;
+ let section=document.getElementById('archiveFilm');if(!section){section=document.createElement('section');section.id='archiveFilm';section.className='view';document.getElementById('detail').after(section);}
+ const watches=allHistory().filter(x=>rcArchiveKey(x)===rcArchiveKey(h)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ const draw=m=>{const url=rcArchivePoster(m);const tmdb=Number(m.tmdb_id);section.innerHTML=`<div class="detail-topbar"><button class="back" id="rcArchiveBack">← Terug naar kijkgeschiedenis</button></div><div class="film-detail-grid"><div class="detail-poster-column"><div class="poster">${url?`<img src="${esc(url)}" alt="${esc(h.title)}">`: `<span class="poster-placeholder"><b>${esc(h.title)}</b></span>`}</div></div><div class="details"><div class="film-kicker">FILMDETAILS / KIJKGESCHIEDENIS</div><h2>${esc(displayFilmTitle(h.title))} <span class="film-year">(${esc(h._year||m.year||'–')})</span></h2><p class="muted">Niet meer in mijn collectie</p><div class="meta">${esc(m.runtime?m.runtime+' min':'')}<br>${esc(m.director||'')}<br>${esc(Array.isArray(m.genres)?m.genres.join(' · '):m.genres||'')}</div><div class="film-facts"><div class="film-fact is-seen"><span class="fact-label">Mijn rating</span>${esc(watches[0]?.rating??'–')}</div><div class="film-fact"><span class="fact-label">Geregistreerde kijkbeurten</span>${watches.length}×</div></div>${tmdb?`<a class="back" href="https://www.themoviedb.org/movie/${tmdb}" target="_blank" rel="noopener noreferrer">Filminformatie, acteurs en trailer op TMDB ↗</a>`:''}<div class="panel"><h3>Kijkgeschiedenis</h3>${watches.map(w=>`<div class="edition">${esc(formatDate(w.date)||w.date)} · ${esc(w.rating??'–')} ★ · ${esc(w.format||'')} · ${esc(w.edition||'')}</div>`).join('')}</div></div></div>`;section.querySelector('#rcArchiveBack').onclick=()=>history.back();};
+ draw({});show('archiveFilm');const m=await rcArchiveMetadata(h);if(request===rcArchiveRequest)draw(m);
+}
+
+function updateCounts(){const uniqueSeen=DATA.films.filter(f=>f.seen||filmHistory(f).some(h=>!h._historyOnly)).length;const entries=rcCollectionHistory().length;rcSetStatsMarkup(DATA.stats.films,uniqueSeen,DATA.films.filter(f=>hasPlayedEdition(f)).length,entries);}
 const todayLocal=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
 // v41 — Alleen ingelogde beheerders kunnen kijkbeurten opslaan.
 function cutName(editionTitle,filmTitle){
