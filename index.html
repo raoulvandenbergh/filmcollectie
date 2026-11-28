@@ -3714,8 +3714,8 @@ function addEdition(existing=null){
  }
  async function diaryFind(){
  const title=val('newFilmTitle'),year=Number(val('newFilmYear'));if(!title||!year||!adminSession)return;
- const seq=++diarySeq;try{const token=await adminAccessToken();const data=await adminRest('rc_letterboxd_diary','GET',null,token,'?select=*&year=eq.'+year+'&title=ilike.'+encodeURIComponent('"'+title.replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/[%_*]/g,x=>'\\'+x)+'"')+'&order=watched_on.asc');if(seq!==diarySeq||title!==val('newFilmTitle')||year!==Number(val('newFilmYear'))||dlg.hidden)return;
- const matches=data.filter(r=>r.title.toLowerCase()===title.toLowerCase());for(const r of matches)if(![...el('rcDiaryRows').children].some(x=>x.dataset.uri===r.uri))diaryRow(r);diaryStatus().textContent=matches.length+' kijkbeurten gevonden. Controleer de selectie; discs en onbekende kijkwijzen zijn niet vooraf geselecteerd.';if(matches.length)el('rcPriorDiary').open=true;
+ const seq=++diarySeq;try{const token=await adminAccessToken();const data=await adminRest('rc_letterboxd_diary','GET',null,token,'?select=*&year=eq.'+year+'&order=watched_on.asc');if(seq!==diarySeq||title!==val('newFilmTitle')||year!==Number(val('newFilmYear'))||dlg.hidden)return;
+ const norm=v=>String(v||'').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();const matches=data.filter(r=>norm(r.title)===norm(title));for(const r of matches)if(![...el('rcDiaryRows').children].some(x=>x.dataset.uri===r.uri))diaryRow(r);diaryStatus().textContent=matches.length+' kijkbeurten gevonden. Controleer de selectie; discs en onbekende kijkwijzen zijn niet vooraf geselecteerd.';if(matches.length)el('rcPriorDiary').open=true;
  }catch(e){if(seq===diarySeq)diaryStatus().textContent='Archief niet beschikbaar: '+e.message;}}
  function diarySchedule(){clearTimeout(diaryTimer);diaryTimer=setTimeout(diaryFind,450);}
  el('rcDiaryFind').onclick=diaryFind;el('rcDiaryAdd').onclick=()=>diaryRow();
