@@ -1242,7 +1242,14 @@ window.rcSiteDialog = (()=>{
  };
 })();
 </script>
-</head><body><header><div><h1 id="homeBrand" role="button" tabindex="0" title="Ga naar collectie" style="cursor:pointer"><img class="rc-brand-icon" src="icons/rc-icon-192.png" alt="RC-logo"> <span class="brand-word">Raoul's Collectie</span></h1><small>Raoul's persoonlijke filmcollectie, op één plek</small></div><nav><button class="active" data-view="collection">Collectie</button><button data-view="diary">Kijkgeschiedenis</button><button data-view="statistics">Statistieken</button><button data-view="wishlist">De Filmwinkel</button><button data-view="gaps">Nog te verzamelen</button><button data-view="labels">Boutique labels</button><button id="adminToggle" class="admin-toggle" type="button">Beheerder inloggen</button></nav></header><main><section id="collection" class="view active"><div class="stats" id="summary"></div><div class="toolbar"><input id="search" type="search" name="rc-collectie-film-titel-zoekveld" aria-label="Zoek films, regisseurs of acteurs" placeholder="Zoek op film, regisseur of acteur…" autocomplete="off" data-lpignore="true" data-1p-ignore="true" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"><select id="genre"><option value="">Alle genres</option></select><select id="format"><option value="">Alle formaten</option><option>4K</option><option>Blu-ray</option></select><select id="watched"><option value="">Alle films</option><option value="seen">Films gezien</option><option value="unseen">Films nog niet gezien</option></select><select id="discFilter" title="Afgespeeld vanaf eigen collectie"><option value="">Alle discs</option><option value="seen">Discs gezien</option><option value="unseen">Nog niet afgespeeld</option><option value="cuts">Nog niet afgespeelde cuts</option></select><button type="button" id="clearFilters" class="clear-filters" title="Wis zoekopdracht en alle filters">✕ Wis filters</button><select id="sort" title="Sorteer films"><option value="title">Titel A–Z ▾</option><option value="runtime_desc">Speelduur: lang → kort</option><option value="runtime_asc">Speelduur: kort → lang</option><option value="title_desc">Titel Z–A</option><option value="year">Jaar (nieuwste)</option><option value="year_asc">Jaar (oudste)</option><option value="rating">Mijn rating (hoogste)</option><option value="rating_asc">Mijn rating (laagste)</option><option value="imdb">IMDb (hoogste)</option><option value="imdb_asc">IMDb (laagste)</option><option value="letterboxd">Letterboxd (hoogste)</option><option value="letterboxd_asc">Letterboxd (laagste)</option></select></div><p id="count" class="muted"></p><div class="collection-action-row"><button id="randomFilmButton" type="button" class="random-film-trigger">✦ Wat kijken we deze keer</button><button id="addFilmButton" class="add-film-btn" type="button">＋ Film toevoegen</button></div><button id="syncFilmIdsButton" class="add-film-btn" type="button" style="margin-left:9px;background:#26354b;color:#d9ed80;border:1px solid #52677b">↻ Filmgegevens koppelen (test)</button><button id="tmdbSelectedSaveButton" class="add-film-btn" type="button" style="margin-left:9px;background:#d9ed80;color:#182016;border:1px solid #d9ed80">✓ 28 TMDB-ID’s koppelen</button><button id="imdbPreviewButton" class="add-film-btn" type="button" style="margin-left:9px;background:#26354b;color:#d9ed80;border:1px solid #52677b">⌕ Controleer ontbrekende IMDb-ID’s</button><button id="imdbSaveButton" class="add-film-btn" type="button" style="margin-left:9px;background:#d9ed80;color:#182016;border:1px solid #d9ed80;display:none" disabled>✓ IMDb-ID’s opslaan</button><p id="syncFilmIdsResult" class="watch-note" role="status" aria-live="polite" hidden></p><div class="poster-settings" id="posterSettings"><label for="tmdbKey"><strong>🎞️ Echte filmposters</strong><br><small>Optioneel: persoonlijke TMDB-sleutel voor extra filmgegevens</small></label><input id="tmdbKey" type="password" placeholder="TMDB API-sleutel (v3)"><button id="activatePosters">Posters laden</button><small id="posterStatus">Sleutel aanvragen via <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">TMDB</a>.</small></div><div id="countryFilterBanner" hidden></div><div class="grid" id="movies"></div></section><section id="gaps" class="view">
+<script>
+window.rcPersistentCache = (()=>{
+ let db;
+ function open(){return db||(db=new Promise((resolve,reject)=>{const r=indexedDB.open('rc-metadata-cache',1);r.onupgradeneeded=()=>r.result.createObjectStore('data');r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error);}).catch(()=>null));}
+ async function run(mode,key,value){const d=await open();if(!d)return;return new Promise((resolve,reject)=>{const t=d.transaction('data',mode),store=t.objectStore('data'),r=mode==='readonly'?store.get(key):store.put(value,key);t.oncomplete=()=>resolve(r.result);t.onerror=()=>reject(t.error);t.onabort=()=>reject(t.error);}).catch(()=>undefined);}
+ return {get:key=>run('readonly',key),put:(key,value)=>run('readwrite',key,value)};
+})();
+</script></head><body><header><div><h1 id="homeBrand" role="button" tabindex="0" title="Ga naar collectie" style="cursor:pointer"><img class="rc-brand-icon" src="icons/rc-icon-192.png" alt="RC-logo"> <span class="brand-word">Raoul's Collectie</span></h1><small>Raoul's persoonlijke filmcollectie, op één plek</small></div><nav><button class="active" data-view="collection">Collectie</button><button data-view="diary">Kijkgeschiedenis</button><button data-view="statistics">Statistieken</button><button data-view="wishlist">De Filmwinkel</button><button data-view="gaps">Nog te verzamelen</button><button data-view="labels">Boutique labels</button><button id="adminToggle" class="admin-toggle" type="button">Beheerder inloggen</button></nav></header><main><section id="collection" class="view active"><div class="stats" id="summary"></div><div class="toolbar"><input id="search" type="search" name="rc-collectie-film-titel-zoekveld" aria-label="Zoek films, regisseurs of acteurs" placeholder="Zoek op film, regisseur of acteur…" autocomplete="off" data-lpignore="true" data-1p-ignore="true" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"><select id="genre"><option value="">Alle genres</option></select><select id="format"><option value="">Alle formaten</option><option>4K</option><option>Blu-ray</option></select><select id="watched"><option value="">Alle films</option><option value="seen">Films gezien</option><option value="unseen">Films nog niet gezien</option></select><select id="discFilter" title="Afgespeeld vanaf eigen collectie"><option value="">Alle discs</option><option value="seen">Discs gezien</option><option value="unseen">Nog niet afgespeeld</option><option value="cuts">Nog niet afgespeelde cuts</option></select><button type="button" id="clearFilters" class="clear-filters" title="Wis zoekopdracht en alle filters">✕ Wis filters</button><select id="sort" title="Sorteer films"><option value="title">Titel A–Z ▾</option><option value="runtime_desc">Speelduur: lang → kort</option><option value="runtime_asc">Speelduur: kort → lang</option><option value="title_desc">Titel Z–A</option><option value="year">Jaar (nieuwste)</option><option value="year_asc">Jaar (oudste)</option><option value="rating">Mijn rating (hoogste)</option><option value="rating_asc">Mijn rating (laagste)</option><option value="imdb">IMDb (hoogste)</option><option value="imdb_asc">IMDb (laagste)</option><option value="letterboxd">Letterboxd (hoogste)</option><option value="letterboxd_asc">Letterboxd (laagste)</option></select></div><p id="count" class="muted"></p><div class="collection-action-row"><button id="randomFilmButton" type="button" class="random-film-trigger">✦ Wat kijken we deze keer</button><button id="addFilmButton" class="add-film-btn" type="button">＋ Film toevoegen</button></div><button id="syncFilmIdsButton" class="add-film-btn" type="button" style="margin-left:9px;background:#26354b;color:#d9ed80;border:1px solid #52677b">↻ Filmgegevens koppelen (test)</button><button id="tmdbSelectedSaveButton" class="add-film-btn" type="button" style="margin-left:9px;background:#d9ed80;color:#182016;border:1px solid #d9ed80">✓ 28 TMDB-ID’s koppelen</button><button id="imdbPreviewButton" class="add-film-btn" type="button" style="margin-left:9px;background:#26354b;color:#d9ed80;border:1px solid #52677b">⌕ Controleer ontbrekende IMDb-ID’s</button><button id="imdbSaveButton" class="add-film-btn" type="button" style="margin-left:9px;background:#d9ed80;color:#182016;border:1px solid #d9ed80;display:none" disabled>✓ IMDb-ID’s opslaan</button><p id="syncFilmIdsResult" class="watch-note" role="status" aria-live="polite" hidden></p><div class="poster-settings" id="posterSettings"><label for="tmdbKey"><strong>🎞️ Echte filmposters</strong><br><small>Optioneel: persoonlijke TMDB-sleutel voor extra filmgegevens</small></label><input id="tmdbKey" type="password" placeholder="TMDB API-sleutel (v3)"><button id="activatePosters">Posters laden</button><small id="posterStatus">Sleutel aanvragen via <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">TMDB</a>.</small></div><div id="countryFilterBanner" hidden></div><div class="grid" id="movies"></div></section><section id="gaps" class="view">
  <div id="rcGaps">
   <div id="rcGapsList">
    <div class="rc-gaps-head"><div class="rc-gaps-eyebrow">RAOUL'S COLLECTIE · ONTBREKENDE FILMS</div><h2>Maak je collectie compleet</h2><p>Ontdek welke speelfilms je nog mist van franchises en regisseurs uit je collectie. Alleen bevestigde speelfilms van minimaal 60 minuten tellen mee; korte films, documentaires en televisiefilms niet.</p></div>
@@ -2606,6 +2613,7 @@ async function loadPublicTrailer(f,id){
 const COUNTRY_CACHE_KEY='rcProductionCountriesV1';
 let countryCache={};
 try{const stored=JSON.parse(localStorage.getItem(COUNTRY_CACHE_KEY)||'{}');if(stored&&typeof stored==='object')countryCache=stored;}catch(e){}
+const countryReady=window.rcPersistentCache.get(COUNTRY_CACHE_KEY).then(saved=>{if(saved)countryCache={...saved,...countryCache};});
 const countryPending=new Map();
 const countryDisplayNames=typeof Intl.DisplayNames==='function'?new Intl.DisplayNames(['nl'],{type:'region'}):null;
 function countryName(code){try{return countryDisplayNames?.of(code)||code}catch(e){return code}}
@@ -2628,7 +2636,7 @@ async function loadFilmCountries(f){
   // Alleen opslaan als de metadata een ondersteund landveld bevat; anders later opnieuw proberen.
   const supported=['production_countries','countries','origin_countries','origin_country'].some(k=>Object.prototype.hasOwnProperty.call(metadata,k))||
     metadata.movie?.production_countries!==undefined||metadata.details?.production_countries!==undefined;
-  if(supported){countryCache[id]=codes;try{localStorage.setItem(COUNTRY_CACHE_KEY,JSON.stringify(countryCache))}catch(e){}}
+  if(supported){countryCache[id]=codes;window.rcPersistentCache.put(COUNTRY_CACHE_KEY,countryCache);try{localStorage.setItem(COUNTRY_CACHE_KEY,JSON.stringify(countryCache))}catch(e){}}
   return codes;
  })();
  countryPending.set(id,job);
@@ -2743,9 +2751,10 @@ async function initWorldMap(){
  const status=$('worldMapStatus');
  try{
   status.textContent='Wereldkaart laden…';
-  const r=await fetch('https://cdn.jsdelivr.net/gh/datasets/geo-countries@master/data/countries.geojson');
-  if(!r.ok)throw Error('Kaart niet beschikbaar');
-  const geo=await r.json();mapFeatures=geo.features||[];
+  await countryReady;
+  let geo=await window.rcPersistentCache.get('world-geo-v1');
+  if(!geo?.features?.length){const r=await fetch('https://cdn.jsdelivr.net/gh/datasets/geo-countries@master/data/countries.geojson');if(!r.ok)throw Error('Kaart niet beschikbaar');geo=await r.json();if(geo.features?.length)window.rcPersistentCache.put('world-geo-v1',geo);}
+  mapFeatures=geo.features||[];
   renderWorldMap();
   if(!mapFeatures.length)throw Error('Geen kaartgegevens');
   scheduleCountryBackfill();
@@ -5397,7 +5406,10 @@ function saveOrder(){
  catch(e){console.warn('Kaartvolgorde kan niet bewaard worden:',e);return false}
 }
 let saveTimer=0;
-function saveCache(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{localStorage.setItem(cacheKey,JSON.stringify({...cache,_featureFilterVersion:featureFilterVersion}))}catch(e){console.warn('Cache niet opgeslagen',e)}},600)}
+function flushCache(){clearTimeout(saveTimer);const snapshot={...cache,_featureFilterVersion:featureFilterVersion};window.rcPersistentCache.put(cacheKey,snapshot);}
+function saveCache(){clearTimeout(saveTimer);saveTimer=setTimeout(flushCache,250)}
+window.addEventListener('pagehide',flushCache);document.addEventListener('visibilitychange',()=>{if(document.hidden)flushCache()});
+const cacheReady=window.rcPersistentCache.get(cacheKey).then(saved=>{if(saved){for(const key of Object.keys(cache)){if((key==='details'||key==='groups')&&saved._featureFilterVersion!==featureFilterVersion)continue;cache[key]={...cache[key],...saved[key]};}}});
 function get(bucket,key){const x=cache[bucket]?.[key];return x&&Date.now()-x.at<ttl?x.value:null}
 function put(bucket,key,value){cache[bucket][key]={at:Date.now(),value};saveCache()}
 async function api(action,body={}){
@@ -5527,7 +5539,7 @@ function scheduleRender(){clearTimeout(renderTimer);renderTimer=setTimeout(rende
 function render(){
  if(activeMovie)return;
  $('rcGapsMinOwned').hidden=mode!=='director';
- makeGroups();const arr=visibleGroups();
+ makeGroups();for(const g of groups){if(!groupMovies.has(g.key)){const stored=get('groups',g.key);if(stored){groupMovies.set(g.key,Array.isArray(stored)?stored:stored.movies);unverifiedCounts.set(g.key,stored.unverified||0);}}}const arr=visibleGroups();
  if(!sortPanel.hidden)renderSort();
  const loaded=arr.filter(g=>groupMovies.has(g.key));
  const missing=loaded.reduce((n,g)=>n+groupMovies.get(g.key).filter(m=>!isOwned(m)).length,0);
@@ -5602,6 +5614,7 @@ async function autoExpand(){
  for(const g of targets){expanded.add(g.key);loadGroup(g.key)}
 }
 async function discover(){
+ await cacheReady;
  if(discoveryRunning)return;
  const ids=[...new Set(DATA.films.map(f=>Number(f._tmdbId)).filter(id=>Number.isSafeInteger(id)&&id>0))];
  discoveryTotal=ids.length;discoveryCount=ids.filter(id=>get('movies',id)).length;
@@ -5693,8 +5706,8 @@ function handleHistory(state){
  else{activeMovie=null;detailRequest++;detail.hidden=true;list.hidden=false;render()}
 }
 function reset(){activeMovie=null;detailRequest++;detail.hidden=true;list.hidden=false;render()}
-window.rcGapsOnShow=()=>{if(activeMovie)return;render();if(!discoveryRunning&&!discoveryDone)discover();else autoExpand()};
-window.rcGapsOnCollectionReady=()=>{discoveryDone=false;render();if(document.querySelector('#gaps.view.active'))discover()};
+window.rcGapsOnShow=async()=>{await cacheReady;if(activeMovie)return;render();if(!discoveryRunning&&!discoveryDone)discover();else autoExpand()};
+window.rcGapsOnCollectionReady=async()=>{await cacheReady;discoveryDone=false;render();if(document.querySelector('#gaps.view.active'))discover()};
 window.rcGapsHandleHistory=handleHistory;
 window.rcGapsReset=reset;
 root.addEventListener('click',e=>{
