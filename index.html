@@ -1324,6 +1324,8 @@ let rcPersonFilterActive=false;
 let rcCrewFilter=null;
 let rcTransitionTimer=null;
 let rcTransitionToken=0;
+let rcHoldCollectionStats=false;
+let rcPendingCollectionStats=null;
 function show(v){
  const old=document.querySelector('.view.active');
  const target=document.getElementById(v);
@@ -1354,6 +1356,7 @@ function show(v){
  },v==='diary'?100:190);
 }
 function showImmediate(v){
+ if(v==='collection'&&rcHoldCollectionStats&&document.getElementById('addFilmDialog')?.hidden){rcHoldCollectionStats=false;if(rcPendingCollectionStats!==null){$('summary').innerHTML=rcPendingCollectionStats;rcPendingCollectionStats=null;}}
  const previous=document.querySelector('.view.active')?.id||lastHistoryView;
  
  if(!navigatingBrowserHistory&&previous!==v){
@@ -1431,7 +1434,7 @@ function rcStatsMarkup(films,seen,discs,entries){
 }
 function rcSetStatsMarkup(films,seen,discs,entries){
  const html=rcStatsMarkup(films,seen,discs,entries);
- $('summary').innerHTML=html;
+ if(rcHoldCollectionStats)rcPendingCollectionStats=html;else $('summary').innerHTML=html;
  $('stats2').innerHTML=html;
 }
 for(const id of ['summary','stats2']){
@@ -3958,7 +3961,10 @@ function addEdition(existing=null){
    await diarySave(diaryItems,filmId,title,year,token);
    status.textContent='✓ Film en fysieke uitgaven opgeslagen. Collectie wordt vernieuwd…';
    const purchasedFromWishlist=purchasedWishlistId;
-   close();await synchronizeCollection();
+   const isNewFilm=!editingId;
+   if(isNewFilm)rcHoldCollectionStats=true;
+   else close();
+   await synchronizeCollection();
    // The diary is reloaded asynchronously. Reconcile AFTER reloading it, so an
    // older/late diary link cannot silently add watches to the manually saved number.
    if(desiredEditionCounts.length){
@@ -3991,10 +3997,12 @@ function addEdition(existing=null){
     });
     if(mismatch)throw Error('Het opgeslagen aantal kon niet worden bevestigd. Probeer opnieuw.');
    }
-   const idx=window.__supabaseFilmIds?.indexOf(filmId);if(idx>=0){detail(DATA.films[idx]);show('detail')}
-   if(!editingId)showPremiere(title,DATA.films[idx]?.poster||DATA.films[idx]?.posterUrl||lookupInfo?.poster_url||'');
+   const idx=window.__supabaseFilmIds?.indexOf(filmId);
+   if(isNewFilm&&!(idx>=0))throw Error('Film opgeslagen, maar de filmpagina kon niet worden geladen. Vernieuw de collectie.');
+   if(idx>=0){detail(DATA.films[idx]);if(isNewFilm){++rcTransitionToken;if(rcTransitionTimer!==null){clearTimeout(rcTransitionTimer);rcTransitionTimer=null;}document.querySelectorAll('.view').forEach(e=>{e.style.transition='';e.style.opacity='';e.style.transform='';});showImmediate('detail');close();}else show('detail')}
+   if(isNewFilm)showPremiere(title,posterCache[idx]||DATA.films[idx]?.poster||DATA.films[idx]?.posterUrl||lookupInfo?.poster_url||'');
    if(purchasedFromWishlist)window.dispatchEvent(new CustomEvent('rc-collection-purchase-saved',{detail:{wishlistId:purchasedFromWishlist,title,filmId}}));
-  }catch(err){status.textContent='Opslaan niet gelukt: '+err.message+(filmId?' De film is mogelijk al aangemaakt; controleer Supabase voordat je opnieuw opslaat.':'');console.error(err)}finally{btn.disabled=false}
+  }catch(err){if(rcHoldCollectionStats&&!dlg.hidden){rcHoldCollectionStats=false;if(rcPendingCollectionStats!==null){$('summary').innerHTML=rcPendingCollectionStats;rcPendingCollectionStats=null;}}status.textContent='Opslaan niet gelukt: '+err.message+(filmId?' De film is mogelijk al aangemaakt; controleer Supabase voordat je opnieuw opslaat.':'');console.error(err)}finally{btn.disabled=false}
  };
 })();
 </script><script>if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('App-cache niet beschikbaar:',err)));}</script><script>
