@@ -3635,8 +3635,27 @@ synchronizeCollection();
   }else art.innerHTML='<div class="premiere-symbol">✦</div>';
   overlay.querySelector('.premiere-title').textContent=title;
   overlay.hidden=true;void overlay.offsetWidth;overlay.hidden=false;
-  let timer=setTimeout(()=>{overlay.hidden=true},3300);
-  overlay.onclick=()=>{clearTimeout(timer);overlay.hidden=true};
+  let ending=false;
+  const finish=()=>{
+   if(ending)return;ending=true;clearTimeout(timer);overlay.onclick=null;
+   if(matchMedia('(prefers-reduced-motion: reduce)').matches||!overlay.animate){overlay.hidden=true;return;}
+   const source=art.querySelector('img');
+   const target=document.querySelector('#detail.active .detail-poster-column .poster, #detail.active .film-detail-grid .poster');
+   const a=source?.getBoundingClientRect(),b=target?.getBoundingClientRect();
+   const duration=850, easing='cubic-bezier(.22,.75,.22,1)';
+   let ghost=null,previousVisibility='';
+   if(a&&b&&a.width&&b.width&&b.bottom>0&&b.top<innerHeight&&source.complete&&source.naturalWidth){
+    ghost=source.cloneNode();ghost.removeAttribute('alt');ghost.setAttribute('aria-hidden','true');
+    Object.assign(ghost.style,{position:'fixed',left:a.left+'px',top:a.top+'px',width:a.width+'px',height:a.height+'px',margin:'0',objectFit:'cover',borderRadius:'5px',zIndex:'30001',pointerEvents:'none',transformOrigin:'top left'});
+    document.body.appendChild(ghost);source.style.visibility='hidden';previousVisibility=target.style.visibility;target.style.visibility='hidden';
+    ghost.animate([{transform:'none',opacity:1},{transform:`translate(${b.left-a.left}px,${b.top-a.top}px) scale(${b.width/a.width},${b.height/a.height})`,opacity:1}],{duration,easing,fill:'forwards'});
+   }
+   overlay.animate([{opacity:1},{opacity:0}],{duration,easing,fill:'forwards'});
+   const cleanup=()=>{overlay.hidden=true;overlay.getAnimations().forEach(x=>x.cancel());if(ghost){target.style.visibility=previousVisibility;source.style.visibility='';ghost.remove();}};
+   setTimeout(cleanup,duration+40);
+  };
+  let timer=setTimeout(finish,3300);
+  overlay.onclick=finish;
  }
 
  function addCut(title='',runtime=''){
