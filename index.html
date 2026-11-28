@@ -3806,7 +3806,7 @@ function addEdition(existing=null){
  el('editFilmButton').onclick=()=>{
   if(!adminSession||activeDetailId<0)return;const f=DATA.films[activeDetailId],id=window.__supabaseFilmIds?.[activeDetailId];if(!id)return;
   reset();explicitEditionRemovals.clear();editingId=id;el('addFilmTitle').textContent='✏️ Film bewerken';el('saveNewFilm').textContent='Wijzigingen opslaan';
-  for(const [field,value] of Object.entries({newFilmTitle:f.title,newFilmYear:f.year,newFilmDirector:f.director,newFilmGenres:f.genres,newFilmRuntime:f.runtime,newFilmLanguage:f.language,newFilmSubtitles:f.subtitles,newFilmImdb:f.imdb,newFilmMyRating:f.rating,newFilmLetterboxd:f.letterboxd,newFilmCast:f.cast,newFilmPriorWatches:f._priorWatches??0}))el(field).value=value??'';
+  for(const [field,value] of Object.entries({newFilmTitle:f.title,newFilmYear:f.year,newFilmDirector:f.director,newFilmGenres:f.genres,newFilmRuntime:f.runtime,newFilmLanguage:f.language,newFilmSubtitles:f.subtitles,newFilmImdb:f.imdb,newFilmMyRating:f.rating,newFilmLetterboxd:f.letterboxd,newFilmCast:f.cast,newFilmPriorWatches:Math.max(0,Number(f.watches||0)-filmHistory(f).length)}))el(field).value=value??'';
   el('newFilmCuts').innerHTML='';el('newFilmEditions').innerHTML='';
   const existingCuts=f.cuts?.length?f.cuts:f.editions.map(ed=>({title:ed.title||f.title,runtime:ed.runtime||f.runtime}));
   for(const c of existingCuts){addCut(c.title,c.runtime);const row=el('newFilmCuts').lastElementChild;row.dataset.dbId=c.dbId||'';row.dataset.watchOffset=String(c.watchOffset||0);row.querySelector('.cut-watches').value=String(Math.max(0,(existingCuts.length===1 && f.editions.length===1) ? ((editionWatchCounts(f).editions.get(String(f.editions[0].dbId))||0)+Number(f.editions[0].watchOffset||0)) : ((editionWatchCounts(f).cuts.get(cutName(c.title,f.title).toLocaleLowerCase('nl-NL'))||0)+Number(c.watchOffset||0))));}
@@ -3926,7 +3926,7 @@ function addEdition(existing=null){
    if(duplicate&&!editingId)throw Error('Deze film staat al in je collectie. Voeg een nieuwe fysieke uitgave bij die bestaande film toe in plaats van een dubbele film.');
    const token=await adminAccessToken();
    const film={title,release_year:year,director:val('newFilmDirector'),genres:val('newFilmGenres'),runtime:runtime>0?runtime:cuts[0].runtime,language:val('newFilmLanguage'),subtitles:val('newFilmSubtitles'),cast_members:val('newFilmCast')};
-   film.prior_watch_count=priorWatches;
+   if(!editingId||priorWatchesTouched)film.prior_watch_count=priorWatches;
    if(window.__rcPriorWatchFlagSupported&&(priorWatchesTouched||(!editingId&&priorWatches>0)))film.prior_watch_count_manual=true;
    film.imdb_rating=val('newFilmImdb')?Number(val('newFilmImdb')):null;film.my_rating=val('newFilmMyRating')?Number(val('newFilmMyRating')):null;film.letterboxd_rating=val('newFilmLetterboxd')?Number(val('newFilmLetterboxd')):null;
    if(lookupInfo?.poster_url&&/^https:\/\/image\.tmdb\.org\/t\/p\//.test(lookupInfo.poster_url))film.poster_url=lookupInfo.poster_url;
