@@ -600,6 +600,7 @@ button:active{transform:scale(.975)}
 @media(max-width:1200px){.diary-calendar{min-width:1120px}}
 /* v65 — bioscooppremière, uitsluitend na succesvolle nieuwe film */
 #premiereOverlay[hidden]{display:none!important}
+#detail.rc-premiere-poster-pending .detail-poster-column .poster,#detail.rc-premiere-poster-pending .film-detail-grid .poster{visibility:hidden!important}
 #premiereOverlay{position:fixed;inset:0;z-index:30000;display:grid;place-items:center;background:rgba(1,9,9,.93);overflow:hidden;isolation:isolate;cursor:pointer}
 .premiere-curtain{position:absolute;top:0;bottom:0;width:52%;z-index:3;background:repeating-linear-gradient(90deg,#330a12 0%,#701e2c 12%,#410e19 22%,#891f32 30%,#330a12 42%);box-shadow:inset 0 0 65px #000a;animation:premiere-open-left 1.15s .18s cubic-bezier(.65,.03,.2,1) both}
 .premiere-curtain.left{left:0}.premiere-curtain.right{right:0;animation-name:premiere-open-right}
@@ -3635,23 +3636,27 @@ synchronizeCollection();
   }else art.innerHTML='<div class="premiere-symbol">✦</div>';
   overlay.querySelector('.premiere-title').textContent=title;
   overlay.hidden=true;void overlay.offsetWidth;overlay.hidden=false;
+  const posterSelector='#detail.active .detail-poster-column .poster, #detail.active .film-detail-grid .poster';
+  const detailView=document.getElementById('detail');
+  detailView.classList.add('rc-premiere-poster-pending');
+  const revealPoster=()=>detailView.classList.remove('rc-premiere-poster-pending');
   let ending=false;
   const finish=()=>{
    if(ending)return;ending=true;clearTimeout(timer);overlay.onclick=null;
-   if(matchMedia('(prefers-reduced-motion: reduce)').matches||!overlay.animate){overlay.hidden=true;return;}
+   if(matchMedia('(prefers-reduced-motion: reduce)').matches||!overlay.animate){overlay.hidden=true;revealPoster();return;}
    const source=art.querySelector('img');
-   const target=document.querySelector('#detail.active .detail-poster-column .poster, #detail.active .film-detail-grid .poster');
+   const target=document.querySelector(posterSelector);
    const a=source?.getBoundingClientRect(),b=target?.getBoundingClientRect();
    const duration=850, easing='cubic-bezier(.22,.75,.22,1)';
-   let ghost=null,previousVisibility='';
+   let ghost=null;
    if(a&&b&&a.width&&b.width&&b.bottom>0&&b.top<innerHeight&&source.complete&&source.naturalWidth){
     ghost=source.cloneNode();ghost.removeAttribute('alt');ghost.setAttribute('aria-hidden','true');
     Object.assign(ghost.style,{position:'fixed',left:a.left+'px',top:a.top+'px',width:a.width+'px',height:a.height+'px',margin:'0',objectFit:'cover',borderRadius:'5px',zIndex:'30001',pointerEvents:'none',transformOrigin:'top left'});
-    document.body.appendChild(ghost);source.style.visibility='hidden';previousVisibility=target.style.visibility;target.style.visibility='hidden';
+    document.body.appendChild(ghost);source.style.visibility='hidden';
     ghost.animate([{transform:'none',opacity:1},{transform:`translate(${b.left-a.left}px,${b.top-a.top}px) scale(${b.width/a.width},${b.height/a.height})`,opacity:1}],{duration,easing,fill:'forwards'});
    }
    overlay.animate([{opacity:1},{opacity:0}],{duration,easing,fill:'forwards'});
-   const cleanup=()=>{overlay.hidden=true;overlay.getAnimations().forEach(x=>x.cancel());if(ghost){target.style.visibility=previousVisibility;source.style.visibility='';ghost.remove();}};
+   const cleanup=()=>{overlay.hidden=true;overlay.getAnimations().forEach(x=>x.cancel());revealPoster();if(ghost){source.style.visibility='';ghost.remove();}};
    setTimeout(cleanup,duration+40);
   };
   let timer=setTimeout(finish,3300);
